@@ -28,6 +28,7 @@ const AuthRoute = lazy(() => import("./component/AuthRoute"));
 const AdminSetting = lazy(() => import("./component/AdminSetting"));
 const SuperFranchiseList = lazy(() => import("./component/SuperFranchiseList"));
 const ManageAdmin  = lazy(() => import("./component/ManageAdmins"));
+const PaymentSuccess  = lazy(() => import("./component/PaymentSuccess"));
 
 function Layout({ children }) {
   const location = useLocation();
@@ -70,6 +71,7 @@ function App() {
                 </AuthRoute>
               }
             />
+            <Route path="/payment-success" element={ <AuthRoute><PaymentSuccess /></AuthRoute>} />
             <Route path="/admin" element={<AuthRoute><AdminPanel /></AuthRoute>} />
             <Route path="/admin/settings" element={<AuthRoute><AdminSetting /> </AuthRoute>} />
             <Route path="/manageadmins" element={<AuthRoute><ManageAdmin /></AuthRoute>} />
