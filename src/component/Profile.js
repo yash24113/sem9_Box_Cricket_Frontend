@@ -1,5 +1,87 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+
+const API_ROOT =
+  process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
+const API = API_ROOT.replace(/\/+$/, "");
+
+/* ---------- helpers ---------- */
+
+// Read whatever we previously stored into localStorage in a tolerant way.
+function getStoredAuth() {
+  try {
+    const raw = localStorage.getItem("loggedInUser");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+
+    // token
+    const token =
+      parsed.token ||
+      parsed.data?.token ||
+      parsed.accessToken ||
+      "";
+
+    // user object may be in several shapes
+    const user =
+      parsed.user ||
+      parsed.data ||
+      (parsed.email ? parsed : null);
+
+    if (!user) return null;
+    return { user, token, raw: parsed };
+  } catch (e) {
+    console.warn("Failed to parse loggedInUser:", e);
+    return null;
+  }
+}
+
+// Persist updated user back in the same key, keeping token & meta.
+function saveAuthWithUser(nextUser) {
+  if (!nextUser) return;
+  let base = {};
+  try {
+    base = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+  } catch {
+    base = {};
+  }
+
+  const merged = {
+    ...base,
+    success: base.success || true,
+    message: base.message || "Login successful",
+    token: base.token || base.data?.token || "",
+    role: nextUser.role || base.role,
+    redirectTo: base.redirectTo || "/",
+    // keep both `data` and `user` so old code & new code work
+    data: nextUser,
+    user: nextUser,
+  };
+
+  localStorage.setItem("loggedInUser", JSON.stringify(merged));
+}
+
+// simple client-side validation
+const validate = (data) => {
+  const e = {};
+  if (!data.fname) e.fname = "First name is required";
+  if (!data.lname) e.lname = "Last name is required";
+  if (data.mobile && !/^[0-9+\-\s]{7,15}$/.test(data.mobile)) {
+    e.mobile = "Enter a valid phone number";
+  }
+  return e;
+};
+
+// convert file → base64 (so we can send via updateUser)
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+/* ---------- Component ---------- */
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -7,26 +89,60 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [updatedProfile, setUpdatedProfile] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
+
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(""); // object URL for preview
+  const [imagePreview, setImagePreview] = useState("");
   const [errors, setErrors] = useState({});
 
-  // Load user from localStorage
-  useEffect(() => {
-    const storedUser = localStorage.getItem("loggedInUser");
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        setCurrentUser(parsed?.data || null);
-        setUpdatedProfile(parsed?.data || {});
-      } catch {
-        // corrupted storage; force logout
-        localStorage.removeItem("loggedInUser");
-      }
-    }
-  }, []);
+  const [token, setToken] = useState("");
 
-  // Preview URL cleanup
+  /* ---- boot: load from localStorage & set axios auth ---- */
+  useEffect(() => {
+    const auth = getStoredAuth();
+    if (!auth || !auth.user) {
+      // no user -> go login
+      navigate("/Signin");
+      return;
+    }
+
+    setCurrentUser(auth.user);
+    setUpdatedProfile(auth.user);
+    setToken(auth.token || "");
+
+    if (auth.token) {
+      axios.defaults.headers.common["Authorization"] =
+        `Bearer ${auth.token}`;
+    }
+  }, [navigate]);
+
+  /* ---- optional: refresh from backend using email ---- */
+  useEffect(() => {
+    const refreshFromApi = async () => {
+      if (!currentUser?.email) return;
+      try {
+        const res = await axios.get(`${API}/viewUser`, {
+          params: { email: currentUser.email },
+        });
+        const list = res?.data?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          // pick first matching record
+          const latest = list[0];
+          setCurrentUser(latest);
+          setUpdatedProfile(latest);
+          saveAuthWithUser(latest);
+        }
+      } catch (err) {
+        // Silent: we still have local data
+        console.warn("Profile refresh failed:", err?.message || err);
+      }
+    };
+    if (currentUser?.email) {
+      refreshFromApi();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.email]);
+
+  /* ---- preview URL cleanup ---- */
   useEffect(() => {
     if (!imageFile) {
       setImagePreview("");
@@ -37,11 +153,13 @@ const Profile = () => {
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
-  // Simple reveal-on-scroll
+  /* ---- simple reveal-on-scroll ---- */
   useEffect(() => {
     const onScroll = () => {
       document.querySelectorAll(".reveal").forEach((el) => {
-        if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add("in");
+        if (el.getBoundingClientRect().top < window.innerHeight - 80) {
+          el.classList.add("in");
+        }
       });
     };
     onScroll();
@@ -49,15 +167,7 @@ const Profile = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Basic client-side validation
-  const validate = (data) => {
-    const e = {};
-    if (!data.fname) e.fname = "First name is required";
-    if (!data.lname) e.lname = "Last name is required";
-    if (data.mobile && !/^[0-9+\-\s]{7,15}$/.test(data.mobile)) e.mobile = "Enter a valid phone number";
-    return e;
-    // (Email is disabled from edits; token/email handled elsewhere.)
-  };
+  /* ---- handlers ---- */
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
@@ -85,66 +195,114 @@ const Profile = () => {
     setImageFile(file);
   };
 
-  const handleUpdateProfile = () => {
-    const next = { ...updatedProfile };
-    // image logic
-    if (imageFile) {
-      // Use preview object URL for immediate UX; normally upload to server & save returned URL
-      next.profile_image = imagePreview;
-    } else if (next.profile_image && !/^https?:\/\//i.test(next.profile_image)) {
-      next.profile_image = `http://localhost:5000/${String(next.profile_image).replace(/^\/+/, "")}`;
+  const handleUpdateProfile = async () => {
+    if (!currentUser) return;
+
+    try {
+      const next = { ...updatedProfile };
+
+      // turn selected image into base64 for persistence
+      if (imageFile) {
+        next.profile_image = await fileToBase64(imageFile);
+      }
+
+      const v = validate(next);
+      setErrors(v);
+      if (Object.keys(v).length) {
+        const first = Object.values(v)[0];
+        if (first) alert(first);
+        return;
+      }
+
+      const id = currentUser._id || currentUser.id;
+      if (!id) {
+        alert("Cannot update profile: missing user id");
+        return;
+      }
+
+      // send to backend
+      const res = await axios.put(
+        `${API}/updateUser/${id}`,
+        next,
+        token
+          ? {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          : undefined
+      );
+
+      const saved = res?.data?.data || next;
+
+      setCurrentUser(saved);
+      setUpdatedProfile(saved);
+      setIsEditing(false);
+      setImageFile(null);
+      saveAuthWithUser(saved);
+
+      alert("Profile updated successfully!");
+    } catch (err) {
+      console.error("Update profile error:", err);
+      alert("Failed to update profile. Please try again.");
     }
-
-    const v = validate(next);
-    setErrors(v);
-    if (Object.keys(v).length) {
-      const first = Object.values(v)[0];
-      if (first) alert(first);
-      return;
-    }
-
-    const updatedUser = { ...currentUser, ...next };
-    const prev = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
-    const fullData = {
-      success: prev?.success || "Login Successful",
-      data: updatedUser,
-      token: prev?.token || "",
-    };
-
-    localStorage.setItem("loggedInUser", JSON.stringify(fullData));
-    setCurrentUser(updatedUser);
-    setIsEditing(false);
-    alert("Profile updated successfully!");
   };
 
   const hasChanges = useMemo(() => {
     if (!currentUser) return false;
-    const keys = ["fname", "lname", "mobile", "gender", "city", "profile_image"];
+    const keys = [
+      "fname",
+      "lname",
+      "mobile",
+      "gender",
+      "city",
+      "about",
+      "profile_image",
+    ];
     for (const k of keys) {
-      if ((updatedProfile?.[k] || "") !== (currentUser?.[k] || "")) return true;
+      if ((updatedProfile?.[k] || "") !== (currentUser?.[k] || ""))
+        return true;
     }
     if (imageFile) return true;
     return false;
   }, [currentUser, updatedProfile, imageFile]);
 
+  /* ---- no user (while loading / missing) ---- */
   if (!currentUser) {
     return (
       <div className="pf-wrap" style={{ padding: "48px 16px" }}>
-        <div className="pf-card reveal" style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ margin: 0, color: "#334155" }}>Please log in to view your profile.</h2>
-          <p style={{ color: "#64748b" }}>You’ll be redirected to sign in.</p>
-          <button className="pf-btn pf-btn-primary" onClick={() => navigate("/Signin")}>Go to Sign in</button>
+        <div
+          className="pf-card reveal"
+          style={{
+            maxWidth: 680,
+            margin: "0 auto",
+            textAlign: "center",
+          }}
+        >
+          <h2 style={{ margin: 0, color: "#334155" }}>
+            Please log in to view your profile.
+          </h2>
+          <p style={{ color: "#64748b" }}>
+            You’ll be redirected to sign in.
+          </p>
+          <button
+            className="pf-btn pf-btn-primary"
+            onClick={() => navigate("/Signin")}
+          >
+            Go to Sign in
+          </button>
         </div>
       </div>
     );
   }
 
   const initials =
-    (currentUser.fname?.[0] || "").toUpperCase() + (currentUser.lname?.[0] || "").toUpperCase();
+    (currentUser.fname?.[0] || "").toUpperCase() +
+    (currentUser.lname?.[0] || "").toUpperCase();
 
   return (
     <div className="pf-wrap">
-      {/* Styles */}
+      {/* inline styles just for this component */}
       <style>{`
         :root{
           --bg:#0f172a; --card:#0b1224; --text:#0e1a2b; --muted:#64748b;
@@ -181,9 +339,7 @@ const Profile = () => {
         .pf-row{display:grid; grid-template-columns: 140px 1fr; gap:16px; align-items:start}
         @media (max-width: 640px){ .pf-row{ grid-template-columns: 1fr; } }
 
-        .pf-avatar{
-          display:grid; place-items:center; gap:10px;
-        }
+        .pf-avatar{display:grid; place-items:center; gap:10px;}
         .pf-img{
           width:120px; height:120px; border-radius:50%; object-fit:cover; background:#fff; border:1px solid rgba(0,0,0,.06);
           box-shadow: var(--shadow);
@@ -234,14 +390,33 @@ const Profile = () => {
       <div className="pf-header reveal">
         <div>
           <div className="pf-chip">Profile</div>
-          <h1 className="pf-title">Welcome, {currentUser.fname}</h1>
-          <div style={{ color: "#64748b", fontSize: 14 }}>{currentUser.email}</div>
+          <h1 className="pf-title">
+            Welcome, {currentUser.fname || "User"}
+          </h1>
+          <div
+            style={{
+              color: "#64748b",
+              fontSize: 14,
+            }}
+          >
+            {currentUser.email}
+          </div>
         </div>
         <div className="pf-actions">
           {!isEditing ? (
             <>
-              <button className="pf-btn pf-btn-primary" onClick={() => setIsEditing(true)}>Edit Profile</button>
-              <button className="pf-btn pf-btn-danger" onClick={handleLogout}>Logout</button>
+              <button
+                className="pf-btn pf-btn-primary"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit Profile
+              </button>
+              <button
+                className="pf-btn pf-btn-danger"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
             </>
           ) : (
             <>
@@ -249,14 +424,24 @@ const Profile = () => {
                 className="pf-btn pf-btn-primary"
                 onClick={handleUpdateProfile}
                 disabled={!hasChanges}
-                title={!hasChanges ? "No changes to save" : "Save changes"}
+                title={
+                  !hasChanges
+                    ? "No changes to save"
+                    : "Save changes"
+                }
               >
                 Save Changes
               </button>
               <button
                 className="pf-btn pf-btn-ghost"
                 onClick={() => {
-                  if (hasChanges && !window.confirm("Discard your unsaved changes?")) return;
+                  if (
+                    hasChanges &&
+                    !window.confirm(
+                      "Discard your unsaved changes?"
+                    )
+                  )
+                    return;
                   setIsEditing(false);
                   setUpdatedProfile(currentUser);
                   setImageFile(null);
@@ -269,7 +454,7 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Card */}
+      {/* Main Card */}
       <div className="pf-card reveal">
         <div className="pf-row">
           {/* Avatar */}
@@ -280,15 +465,29 @@ const Profile = () => {
                 src={imagePreview || currentUser.profile_image}
                 alt="Profile"
                 onError={(e) => {
-                  e.currentTarget.src = "https://via.placeholder.com/120?text=No+Image";
+                  e.currentTarget.src =
+                    "https://via.placeholder.com/120?text=No+Image";
                 }}
               />
             ) : (
-              <div className="pf-initials" aria-label="User initials">{initials || "U"}</div>
+              <div
+                className="pf-initials"
+                aria-label="User initials"
+              >
+                {initials || "U"}
+              </div>
             )}
 
             <div style={{ width: "100%" }}>
-              <label htmlFor="file" style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 6 }}>
+              <label
+                htmlFor="file"
+                style={{
+                  fontSize: 12,
+                  color: "#64748b",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
                 Profile Image
               </label>
               <input
@@ -302,7 +501,10 @@ const Profile = () => {
               {imagePreview && isEditing && (
                 <button
                   className="pf-btn"
-                  style={{ marginTop: 8, width: "100%" }}
+                  style={{
+                    marginTop: 8,
+                    width: "100%",
+                  }}
                   onClick={() => setImageFile(null)}
                   type="button"
                 >
@@ -327,7 +529,11 @@ const Profile = () => {
                     onChange={handleInputChange}
                     disabled={!isEditing}
                   />
-                  {errors.fname && <div className="pf-error">{errors.fname}</div>}
+                  {errors.fname && (
+                    <div className="pf-error">
+                      {errors.fname}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pf-field">
@@ -339,12 +545,21 @@ const Profile = () => {
                     onChange={handleInputChange}
                     disabled={!isEditing}
                   />
-                  {errors.lname && <div className="pf-error">{errors.lname}</div>}
+                  {errors.lname && (
+                    <div className="pf-error">
+                      {errors.lname}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pf-field">
                   <label>Email</label>
-                  <input className="pf-input" name="email" value={updatedProfile.email || ""} disabled />
+                  <input
+                    className="pf-input"
+                    name="email"
+                    value={updatedProfile.email || ""}
+                    disabled
+                  />
                 </div>
 
                 <div className="pf-field">
@@ -357,7 +572,11 @@ const Profile = () => {
                     disabled={!isEditing}
                     placeholder="+91 9xxxxxxxxx"
                   />
-                  {errors.mobile && <div className="pf-error">{errors.mobile}</div>}
+                  {errors.mobile && (
+                    <div className="pf-error">
+                      {errors.mobile}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -374,7 +593,10 @@ const Profile = () => {
                         type="radio"
                         name="gender"
                         value="Male"
-                        checked={updatedProfile.gender === "Male"}
+                        checked={
+                          updatedProfile.gender ===
+                          "Male"
+                        }
                         onChange={handleInputChange}
                         disabled={!isEditing}
                       />{" "}
@@ -385,7 +607,10 @@ const Profile = () => {
                         type="radio"
                         name="gender"
                         value="Female"
-                        checked={updatedProfile.gender === "Female"}
+                        checked={
+                          updatedProfile.gender ===
+                          "Female"
+                        }
                         onChange={handleInputChange}
                         disabled={!isEditing}
                       />{" "}
@@ -403,16 +628,24 @@ const Profile = () => {
                     onChange={handleInputChange}
                     disabled={!isEditing}
                   >
-                    <option value="">Select City</option>
-                    <option value="Ahmedabad">Ahmedabad</option>
-                    <option value="Rajkot">Rajkot</option>
-                    <option value="Surat">Surat</option>
+                    <option value="">
+                      Select City
+                    </option>
+                    <option value="Ahmedabad">
+                      Ahmedabad
+                    </option>
+                    <option value="Rajkot">
+                      Rajkot
+                    </option>
+                    <option value="Surat">
+                      Surat
+                    </option>
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* About / Notes (optional) */}
+            {/* Notes */}
             <div className="pf-section">
               <h3>Notes</h3>
               <div className="pf-field">
@@ -433,10 +666,18 @@ const Profile = () => {
             <div className="pf-footer">
               {!isEditing ? (
                 <>
-                  <button className="pf-btn pf-btn-primary" onClick={() => setIsEditing(true)}>
+                  <button
+                    className="pf-btn pf-btn-primary"
+                    onClick={() =>
+                      setIsEditing(true)
+                    }
+                  >
                     Update Profile
                   </button>
-                  <button className="pf-btn pf-btn-danger" onClick={handleLogout}>
+                  <button
+                    className="pf-btn pf-btn-danger"
+                    onClick={handleLogout}
+                  >
                     Logout
                   </button>
                 </>
@@ -446,16 +687,28 @@ const Profile = () => {
                     className="pf-btn pf-btn-primary"
                     onClick={handleUpdateProfile}
                     disabled={!hasChanges}
-                    title={!hasChanges ? "No changes to save" : "Save changes"}
+                    title={
+                      !hasChanges
+                        ? "No changes to save"
+                        : "Save changes"
+                    }
                   >
                     Save Changes
                   </button>
                   <button
                     className="pf-btn"
                     onClick={() => {
-                      if (hasChanges && !window.confirm("Discard your unsaved changes?")) return;
+                      if (
+                        hasChanges &&
+                        !window.confirm(
+                          "Discard your unsaved changes?"
+                        )
+                      )
+                        return;
                       setIsEditing(false);
-                      setUpdatedProfile(currentUser);
+                      setUpdatedProfile(
+                        currentUser
+                      );
                       setImageFile(null);
                     }}
                   >
