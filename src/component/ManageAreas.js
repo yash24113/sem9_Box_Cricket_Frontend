@@ -13,7 +13,43 @@ const Alert = React.forwardRef(function Alert(props, ref) {
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
 });
 
-const API_ROOT = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api/userapi";
+// Must match backend mount: app.use("/api/userapi", ...)
+const API_ROOT = (
+  process.env.REACT_APP_API_BASE_URL ||
+  "http://localhost:5000/api/userapi"
+).replace(/\/+$/, "");
+
+/* ---------- helpers ---------- */
+
+function getStoredUser() {
+  // Try loggedInUser
+  try {
+    const raw = localStorage.getItem("loggedInUser");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.data) return parsed.data;        // { data: user }
+      if (parsed?.user) return parsed.user;        // { user: user }
+      if (parsed?.email || parsed?.role) return parsed; // plain user
+    }
+  } catch (e) {
+    console.warn("Failed to parse loggedInUser:", e);
+  }
+
+  // Fallback: adminUser
+  try {
+    const rawAdmin = localStorage.getItem("adminUser");
+    if (rawAdmin) {
+      const parsed = JSON.parse(rawAdmin);
+      if (parsed?.data) return parsed.data;
+      if (parsed?.user) return parsed.user;
+      if (parsed?.email || parsed?.role) return parsed;
+    }
+  } catch (e) {
+    console.warn("Failed to parse adminUser:", e);
+  }
+
+  return null;
+}
 
 const ManageAreas = () => {
   const [areas, setAreas] = useState([]);
@@ -22,85 +58,84 @@ const ManageAreas = () => {
   const [editAreaId, setEditAreaId] = useState(null);
   const [areaToDelete, setAreaToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(3); // 3 per page
+  const [itemsPerPage] = useState(3);
 
-  // ---- who is logged in (for scoping) ----
-  const loginBlob = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("loggedInUser") || "{}");
-    } catch {
-      return {};
-    }
-  }, []);
-  const currentUser = loginBlob?.data || null;
-  const role =
-    currentUser?.role ||
-    (currentUser?.email === "superadmin@gmail.com" ? "superadmin" : "user");
+  // Logged-in user + role
+  const user = useMemo(() => getStoredUser(), []);
+  const role = useMemo(() => {
+    if (user?.role) return user.role;
+    if (user?.email === "superadmin@gmail.com") return "superadmin";
+    return "user";
+  }, [user]);
 
-  const adminCity = String(currentUser?.city || "").trim();
-  const adminState = String(currentUser?.state || "").trim();
-  const adminAddress = String(currentUser?.address || "").trim();
+  const adminCity = String(user?.city || "").trim();
 
-  // token header (optional)
+  // Attach token (if any)
   useEffect(() => {
     const token =
       localStorage.getItem("adminToken") ||
       localStorage.getItem("token") ||
       "";
-    if (token) axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
   }, []);
 
   useEffect(() => {
     fetchAreas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAreas = async () => {
     try {
-      // backend exposes /viewArea in your codebase; keep the same path
       const res = await axios.get(`${API_ROOT}/viewArea`);
       const all = res?.data?.data || [];
 
-      // Scope to admin’s address unless superadmin
-      const scoped =
-        role === "superadmin"
-          ? all
-          : all.filter((a) => matchesAdminAddress(a?.area_name, adminCity, adminState, adminAddress));
+      let scoped = all;
 
+      // If you want admin to see only their-city areas (assuming area_name includes city)
+      if (role === "admin" && adminCity) {
+        const city = adminCity.toLowerCase();
+        scoped = all.filter((a) =>
+          String(a.area_name || "").toLowerCase().includes(city)
+        );
+      }
+
+      // superadmin -> all; user -> here we keep all so they see data
       setAreas(scoped);
 
-      // optionally store allowed areas for other pages (e.g., Add Slot dropdown can read this)
+      // Optional: store for dropdowns elsewhere
       try {
-        localStorage.setItem("allowedAreasForDropdown", JSON.stringify(scoped));
-      } catch {}
-
+        localStorage.setItem(
+          "allowedAreasForDropdown",
+          JSON.stringify(scoped)
+        );
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       console.error("Error fetching areas:", error);
-      setSnackbar({ open: true, message: "Failed to fetch areas!", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Failed to fetch areas!",
+        severity: "error",
+      });
     }
   };
-
-  // Robust match: exact city match OR present inside address string; case-insensitive
-  function matchesAdminAddress(areaName, city, state, address) {
-    const a = String(areaName || "").toLowerCase().trim();
-    const c = String(city || "").toLowerCase().trim();
-    const s = String(state || "").toLowerCase().trim();
-    const ad = String(address || "").toLowerCase();
-
-    if (!a) return false;
-    if (c && a === c) return true;      // exact city match
-    if (s && a === s) return true;      // rarely needed, but safe
-    if (ad && ad.includes(a)) return true; // area string appears in full address
-    return false;
-  }
 
   const openAdd = () => {
     setShowAddModal(true);
     setEditAreaId(null);
-    setAreaName(role === "superadmin" ? "" : adminCity || ""); // hint for admins
+    // For admin, you can hint with their city; superadmin starts blank
+    setAreaName(role === "admin" && adminCity ? adminCity : "");
   };
 
   const openEdit = (area) => {
@@ -112,83 +147,141 @@ const ManageAreas = () => {
   const handleSave = async () => {
     const name = String(areaName || "").trim();
     if (!name) {
-      setSnackbar({ open: true, message: "Area name cannot be empty!", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Area name cannot be empty!",
+        severity: "error",
+      });
       return;
     }
 
-    // Non-superadmin should not rename to something outside their city
-    if (role !== "superadmin" && adminCity && name.toLowerCase() !== adminCity.toLowerCase()) {
-      setSnackbar({ open: true, message: `You can only use your city: ${adminCity}`, severity: "warning" });
+    // If you want to enforce admin only using their city:
+    if (
+      role === "admin" &&
+      adminCity &&
+      name.toLowerCase().indexOf(adminCity.toLowerCase()) === -1
+    ) {
+      setSnackbar({
+        open: true,
+        message: `You are limited to your city (${adminCity}) while adding/editing areas.`,
+        severity: "warning",
+      });
       return;
     }
 
     try {
       if (editAreaId) {
-        await axios.put(`${API_ROOT}/updateArea/${editAreaId}`, { area_name: name });
-        setSnackbar({ open: true, message: "Area updated successfully!", severity: "success" });
+        await axios.put(`${API_ROOT}/updateArea/${editAreaId}`, {
+          area_name: name,
+        });
+        setSnackbar({
+          open: true,
+          message: "Area updated successfully!",
+          severity: "success",
+        });
       } else {
-        // If you want only superadmin to create new areas, uncomment the guard below:
-        // if (role !== "superadmin") {
-        //   setSnackbar({ open: true, message: "Only Superadmin can create new areas.", severity: "warning" });
-        //   return;
-        // }
-        await axios.post(`${API_ROOT}/addArea`, { area_name: name });
-        setSnackbar({ open: true, message: "Area added successfully!", severity: "success" });
+        await axios.post(`${API_ROOT}/addArea`, {
+          area_name: name,
+        });
+        setSnackbar({
+          open: true,
+          message: "Area added successfully!",
+          severity: "success",
+        });
       }
       await fetchAreas();
       setShowAddModal(false);
       setAreaName("");
       setEditAreaId(null);
-      setCurrentPage(1); // reset to first page after changes
+      setCurrentPage(1);
     } catch (error) {
       console.error("Error saving area:", error);
-      setSnackbar({ open: true, message: "Operation failed!", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Operation failed!",
+        severity: "error",
+      });
     }
   };
 
   const handleDelete = async () => {
     if (!areaToDelete?._id) return;
     try {
-      await axios.delete(`${API_ROOT}/deleteArea/${areaToDelete._id}`);
-      setSnackbar({ open: true, message: "Area deleted successfully!", severity: "warning" });
+      await axios.delete(
+        `${API_ROOT}/deleteArea/${areaToDelete._id}`
+      );
+      setSnackbar({
+        open: true,
+        message: "Area deleted successfully!",
+        severity: "warning",
+      });
       await fetchAreas();
       setAreaToDelete(null);
       setCurrentPage(1);
     } catch (error) {
       console.error("Error deleting area:", error);
-      setSnackbar({ open: true, message: "Delete failed!", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Delete failed!",
+        severity: "error",
+      });
     }
   };
 
   // Filter by search (after scoping)
   const filteredAreas = areas.filter((area) =>
-    String(area.area_name || "").toLowerCase().includes(searchQuery.toLowerCase())
+    String(area.area_name || "")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
   );
 
   // Pagination
   const indexOfLastArea = currentPage * itemsPerPage;
   const indexOfFirstArea = indexOfLastArea - itemsPerPage;
-  const currentAreas = filteredAreas.slice(indexOfFirstArea, indexOfLastArea);
-  const totalPages = Math.ceil(filteredAreas.length / itemsPerPage);
+  const currentAreas = filteredAreas.slice(
+    indexOfFirstArea,
+    indexOfLastArea
+  );
+  const totalPages = Math.ceil(
+    filteredAreas.length / itemsPerPage
+  );
 
-  const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
+  const handlePageChange = (pageNumber) =>
+    setCurrentPage(pageNumber);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+      }}
+    >
       <AdminHeader />
 
       <div style={{ display: "flex", flex: 1 }}>
         <AdminSidebar />
 
-        <div style={{ textAlign: "center", marginTop: "20px", width: "100%" }}>
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: "20px",
+            width: "100%",
+          }}
+        >
           <h1>Manage Areas</h1>
 
-          {/* Scope hint (optional) */}
-          {role !== "superadmin" ? (
-            <p style={{ marginTop: -8, color: "#6b7280" }}>
-              Showing areas for: <b>{adminCity || "—"}</b>{adminState ? `, ${adminState}` : ""}
+          {role === "admin" && (
+            <p
+              style={{
+                marginTop: -8,
+                color: "#6b7280",
+              }}
+            >
+              Showing areas for your city:{" "}
+              <b>{adminCity || "Not set"}</b>
             </p>
-          ) : null}
+          )}
 
           <input
             type="text"
@@ -201,12 +294,13 @@ const ManageAreas = () => {
             style={styles.searchBox}
           />
 
-          {/* Optional: hide Add button for non-superadmin (uncomment to enforce) */}
-          {/* {role === "superadmin" && ( */}
-            <button onClick={openAdd} style={styles.addButton}>
-              + Add Area
-            </button>
-          {/* )} */}
+          {/* Allow both superadmin & admin to add; tweak if needed */}
+          <button
+            onClick={openAdd}
+            style={styles.addButton}
+          >
+            + Add Area
+          </button>
 
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
@@ -219,26 +313,57 @@ const ManageAreas = () => {
               </thead>
               <tbody>
                 {currentAreas.length > 0 ? (
-                  currentAreas.map((area, index) => (
-                    <tr
-                      key={area._id}
-                      style={index % 2 === 0 ? styles.evenRow : styles.oddRow}
-                    >
-                      <td style={styles.td}>{area._id}</td>
-                      <td style={styles.td}>{area.area_name}</td>
-                      <td style={styles.td}>
-                        <button onClick={() => openEdit(area)} style={styles.editButton}>
-                          ✏️
-                        </button>
-                        <button onClick={() => setAreaToDelete(area)} style={styles.deleteButton}>
-                          ✖️
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  currentAreas.map(
+                    (area, index) => (
+                      <tr
+                        key={area._id}
+                        style={
+                          index % 2 === 0
+                            ? styles.evenRow
+                            : styles.oddRow
+                        }
+                      >
+                        <td style={styles.td}>
+                          {area._id}
+                        </td>
+                        <td style={styles.td}>
+                          {area.area_name}
+                        </td>
+                        <td style={styles.td}>
+                          <button
+                            onClick={() =>
+                              openEdit(area)
+                            }
+                            style={
+                              styles.editButton
+                            }
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() =>
+                              setAreaToDelete(
+                                area
+                              )
+                            }
+                            style={
+                              styles.deleteButton
+                            }
+                          >
+                            ✖️
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )
                 ) : (
                   <tr>
-                    <td colSpan="3" style={styles.td}>No Areas Found</td>
+                    <td
+                      colSpan="3"
+                      style={styles.td}
+                    >
+                      No Areas Found
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -259,35 +384,82 @@ const ManageAreas = () => {
       {showAddModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3>{editAreaId ? "Edit Area" : "Add New Area"}</h3>
-
-            {/* For admins, pre-fill with their city; you can disable editing if you want strict enforcement */}
+            <h3>
+              {editAreaId
+                ? "Edit Area"
+                : "Add New Area"}
+            </h3>
             <input
               type="text"
               placeholder="Enter Area Name"
               value={areaName}
-              onChange={(e) => setAreaName(e.target.value)}
+              onChange={(e) =>
+                setAreaName(e.target.value)
+              }
               style={styles.input}
               autoFocus
             />
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button onClick={handleSave} style={styles.saveButton}>Save</button>
-              <button onClick={() => { setShowAddModal(false); setEditAreaId(null); setAreaName(""); }} style={styles.cancelButton}>Cancel</button>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "center",
+              }}
+            >
+              <button
+                onClick={handleSave}
+                style={styles.saveButton}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditAreaId(null);
+                  setAreaName("");
+                }}
+                style={styles.cancelButton}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete confirm (simple) */}
+      {/* Delete confirm */}
       {areaToDelete && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
             <h3>Delete Area</h3>
-            <p>Are you sure you want to delete <b>{areaToDelete.area_name}</b>?</p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button onClick={handleDelete} style={styles.deleteButton}>Delete</button>
-              <button onClick={() => setAreaToDelete(null)} style={styles.cancelButton}>Cancel</button>
+            <p>
+              Are you sure you want to delete{" "}
+              <b>
+                {areaToDelete.area_name}
+              </b>
+              ?
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "center",
+              }}
+            >
+              <button
+                onClick={handleDelete}
+                style={styles.deleteButton}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() =>
+                  setAreaToDelete(null)
+                }
+                style={styles.cancelButton}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -297,9 +469,22 @@ const ManageAreas = () => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        onClose={() =>
+          setSnackbar({
+            ...snackbar,
+            open: false,
+          })
+        }
       >
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>
+        <Alert
+          onClose={() =>
+            setSnackbar({
+              ...snackbar,
+              open: false,
+            })
+          }
+          severity={snackbar.severity}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
@@ -307,20 +492,69 @@ const ManageAreas = () => {
   );
 };
 
-// Styles (same visual language you already use)
 const styles = {
-  container: { textAlign: "center", marginTop: "20px", width: "100%" },
-  heading: { color: "#333", fontSize: "26px", marginBottom: "20px", textTransform: "uppercase" },
-  searchBox: { width: "80%", padding: "10px", marginBottom: "15px", fontSize: "16px", borderRadius: "5px", border: "1px solid #ccc" },
-  addButton: { backgroundColor: "#007bff", color: "white", padding: "10px", borderRadius: "5px", cursor: "pointer", border: "none", marginLeft: 10 },
-  tableWrapper: { width: "90%", margin: "auto", overflowX: "auto", borderRadius: "10px", padding: "15px" },
-  table: { width: "100%", borderCollapse: "collapse" },
-  th: { backgroundColor: "#007bff", color: "white", padding: "12px", textAlign: "center" },
-  td: { padding: "12px", textAlign: "center" },
-  evenRow: { backgroundColor: "#f8f9fa" },
-  oddRow: { backgroundColor: "#ffffff" },
-  editButton: { backgroundColor: "#28a745", color: "white", padding: "6px 12px", cursor: "pointer", borderRadius: "5px", border: "none" },
-  deleteButton: { backgroundColor: "#dc3545", color: "white", padding: "6px 12px", cursor: "pointer", borderRadius: "5px", border: "none" },
+  searchBox: {
+    width: "80%",
+    padding: "10px",
+    marginBottom: "15px",
+    fontSize: "16px",
+    borderRadius: "5px",
+    border: "1px solid #ccc",
+  },
+  addButton: {
+    backgroundColor: "#007bff",
+    color: "white",
+    padding: "10px",
+    borderRadius: "5px",
+    cursor: "pointer",
+    border: "none",
+    marginLeft: 10,
+    marginBottom: 10,
+  },
+  tableWrapper: {
+    width: "90%",
+    margin: "auto",
+    overflowX: "auto",
+    borderRadius: "10px",
+    padding: "15px",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+  },
+  th: {
+    backgroundColor: "#007bff",
+    color: "white",
+    padding: "12px",
+    textAlign: "center",
+  },
+  td: {
+    padding: "12px",
+    textAlign: "center",
+  },
+  evenRow: {
+    backgroundColor: "#f8f9fa",
+  },
+  oddRow: {
+    backgroundColor: "#ffffff",
+  },
+  editButton: {
+    backgroundColor: "#28a745",
+    color: "white",
+    padding: "6px 12px",
+    cursor: "pointer",
+    borderRadius: "5px",
+    border: "none",
+    marginRight: 6,
+  },
+  deleteButton: {
+    backgroundColor: "#dc3545",
+    color: "white",
+    padding: "6px 12px",
+    cursor: "pointer",
+    borderRadius: "5px",
+    border: "none",
+  },
   modalOverlay: {
     position: "fixed",
     top: 0,
@@ -349,8 +583,22 @@ const styles = {
     borderRadius: "5px",
     border: "1px solid #ccc",
   },
-  saveButton: { backgroundColor: "#007bff", color: "white", padding: "10px", cursor: "pointer", border: "none", borderRadius: "5px" },
-  cancelButton: { backgroundColor: "#6b7280", color: "white", padding: "10px", cursor: "pointer", border: "none", borderRadius: "5px" },
+  saveButton: {
+    backgroundColor: "#007bff",
+    color: "white",
+    padding: "10px",
+    cursor: "pointer",
+    border: "none",
+    borderRadius: "5px",
+  },
+  cancelButton: {
+    backgroundColor: "#6b7280",
+    color: "white",
+    padding: "10px",
+    cursor: "pointer",
+    border: "none",
+    borderRadius: "5px",
+  },
 };
 
 export default ManageAreas;

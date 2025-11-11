@@ -1,44 +1,140 @@
+// AdminPanel.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
 import AdminHeader from "./AdminHeader";
 import AdminFooter from "./AdminFooter";
 import axios from "axios";
-import { FaMapMarkerAlt, FaClock, FaComments, FaEnvelope, FaUserAlt, FaCalendarAlt } from "react-icons/fa";
+import {
+  FaMapMarkerAlt,
+  FaClock,
+  FaComments,
+  FaEnvelope,
+  FaUserAlt,
+  FaCalendarAlt,
+} from "react-icons/fa";
 
-const API_ROOT = process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
+const RAW_API_ROOT =
+  process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
+const API_ROOT = RAW_API_ROOT.replace(/\/+$/, "");
 
 async function getScopedSummary(city) {
   const qs = city ? `?city=${encodeURIComponent(city)}` : "";
   const url = `${API_ROOT}/counts/summary${qs}`;
-  try { const r = await axios.get(url); return r?.data?.data || {}; } catch { return {}; }
+  try {
+    const r = await axios.get(url);
+    return r?.data?.data || {};
+  } catch (err) {
+    console.warn("summary error:", err?.message || err);
+    return {};
+  }
 }
 
-const Card = ({ icon, label, value, color = "#2c4c97", onClick, loading }) => (
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("loggedInUser");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.data) return parsed.data;
+      if (parsed?.user) return parsed.user;
+      if (parsed?.email || parsed?.role) return parsed;
+    }
+  } catch (e) {
+    console.warn("Failed to parse loggedInUser:", e);
+  }
+
+  try {
+    const rawAdmin = localStorage.getItem("adminUser");
+    if (rawAdmin) {
+      const parsed = JSON.parse(rawAdmin);
+      if (parsed?.data) return parsed.data;
+      if (parsed?.user) return parsed.user;
+      if (parsed?.email || parsed?.role) return parsed;
+    }
+  } catch (e) {
+    console.warn("Failed to parse adminUser:", e);
+  }
+
+  return null;
+}
+
+const Card = ({
+  icon,
+  label,
+  value,
+  color = "#2c4c97",
+  onClick,
+  loading,
+}) => (
   <div
     onClick={onClick}
     style={{
-      borderRadius: 16, background: "#ffffff",
-      border: "1px solid rgba(17,35,56,.08)", boxShadow: "0 10px 28px rgba(17,35,56,.10)",
-      padding: 18, flex: "1 1 240px", minWidth: 240,
-      cursor: onClick ? "pointer" : "default", transition: "transform .12s, box-shadow .25s",
+      borderRadius: 16,
+      background: "#ffffff",
+      border: "1px solid rgba(17,35,56,.08)",
+      boxShadow: "0 10px 28px rgba(17,35,56,.10)",
+      padding: 18,
+      flex: "1 1 240px",
+      minWidth: 240,
+      cursor: onClick ? "pointer" : "default",
+      transition: "transform .12s, box-shadow .25s",
     }}
-    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 18px 40px rgba(17,35,56,.16)"; }}
-    onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 10px 28px rgba(17,35,56,.10)"; }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = "translateY(-2px)";
+      e.currentTarget.style.boxShadow =
+        "0 18px 40px rgba(17,35,56,.16)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = "none";
+      e.currentTarget.style.boxShadow =
+        "0 10px 28px rgba(17,35,56,.10)";
+    }}
   >
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-      <div style={{ width: 42, height: 42, borderRadius: 12, display: "grid", placeItems: "center",
-        background: "rgba(44,76,151,.08)", border: "1px solid rgba(44,76,151,.16)", color }} >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 12,
+          display: "grid",
+          placeItems: "center",
+          background: "rgba(44,76,151,.08)",
+          border: "1px solid rgba(44,76,151,.16)",
+          color,
+        }}
+      >
         {icon}
       </div>
-      <span style={{ fontSize: 12, padding: "4px 8px", borderRadius: 999, background: "rgba(16,185,129,.12)",
-        color: "#065f46", border: "1px solid rgba(16,185,129,.25)", userSelect: "none" }}>
+      <span
+        style={{
+          fontSize: 12,
+          padding: "4px 8px",
+          borderRadius: 999,
+          background: "rgba(16,185,129,.12)",
+          color: "#065f46",
+          border: "1px solid rgba(16,185,129,.25)",
+          userSelect: "none",
+        }}
+      >
         + live
       </span>
     </div>
     <div style={{ fontSize: 13, color: "#6b7280" }}>{label}</div>
-    <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a" }}>
-      {loading ? "…" : (value ?? 0)}
+    <div
+      style={{
+        fontSize: 28,
+        fontWeight: 900,
+        color: "#0f172a",
+      }}
+    >
+      {loading ? "…" : value ?? 0}
     </div>
   </div>
 );
@@ -48,61 +144,237 @@ const AdminPanel = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const loginBlob = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("loggedInUser") || "{}"); } catch { return {}; }
-  }, []);
-  const user = loginBlob?.data || null;
-  const role = (user?.role) || (user?.email === 'superadmin@gmail.com' ? 'superadmin' : 'user');
-  const scopeCity = role === 'admin' ? (user?.city || '') : '';
+  const user = useMemo(() => getStoredUser(), []);
+  const role = useMemo(() => {
+    if (user?.role) return user.role;
+    if (user?.email === "superadmin@gmail.com") return "superadmin";
+    return "user";
+  }, [user]);
 
+  const scopeCity = role === "admin" ? user?.city || "" : "";
+  const adminAddress = (user?.address || "").trim();
+
+  // Protect route (only admin / superadmin)
   useEffect(() => {
+    if (!user) {
+      navigate("/Signin");
+      return;
+    }
+    if (role !== "admin" && role !== "superadmin") {
+      navigate("/");
+    }
+  }, [user, role, navigate]);
+
+  // Load summary (with special handling for admin areaWiseSlots)
+  useEffect(() => {
+    let cancelled = false;
+
     (async () => {
+      if (!user) return;
       setLoading(true);
-      const s = await getScopedSummary(scopeCity);
-      setSummary(s);
-      setLoading(false);
+
+      try {
+        // Base summary (superadmin: all, admin: city-scoped if you use that backend filter)
+        let baseSummary =
+          role === "admin"
+            ? await getScopedSummary(scopeCity)
+            : await getScopedSummary("");
+
+        // For admin: override areaWiseSlots using admin.address
+        if (role === "admin" && adminAddress) {
+          const addrNorm = adminAddress.toLowerCase();
+
+          const slotsRes = await axios.get(
+            `${API_ROOT}/viewAreaWiseSlot`
+          );
+          const allSlots = slotsRes?.data?.data || [];
+
+          const scopedCount = allSlots.filter((slot) => {
+            const areaName = (slot.area?.area_name || "")
+              .trim()
+              .toLowerCase();
+            return areaName && areaName === addrNorm;
+          }).length;
+
+          baseSummary = {
+            ...baseSummary,
+            areaWiseSlots: scopedCount,
+          };
+        }
+
+        if (!cancelled) {
+          setSummary(baseSummary || {});
+        }
+      } catch (err) {
+        console.warn("admin panel summary load error:", err);
+        if (!cancelled) setSummary({});
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
-  }, [scopeCity]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, role, scopeCity, adminAddress]);
 
   const at = (ts) => new Date(ts).toLocaleString();
-
-  const cardBgColor = localStorage.getItem("adminCardBgColor") || "#1f2937";
-  const textColor = localStorage.getItem("adminTextColor") || "#ffffff";
+  const cardBgColor =
+    localStorage.getItem("adminCardBgColor") || "#1f2937";
+  const textColor =
+    localStorage.getItem("adminTextColor") || "#ffffff";
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", background: "#f4f6f9" }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        flexDirection: "column",
+        background: "#f4f6f9",
+      }}
+    >
       <AdminHeader />
       <div style={{ display: "flex", flex: 1 }}>
         <AdminSidebar />
-        <div style={{ flex: 1, padding: 20, overflowY: "auto", background: "#eef2f7" }}>
-          <div style={{
-            background: `linear-gradient(120deg, ${cardBgColor} 0%, #243b55 100%)`,
-            color: textColor, borderRadius: 16, padding: 16,
-            border: "1px solid rgba(255,255,255,.08)", boxShadow: "0 10px 28px rgba(0,0,0,.18)", marginBottom: 16,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div
+          style={{
+            flex: 1,
+            padding: 20,
+            overflowY: "auto",
+            background: "#eef2f7",
+          }}
+        >
+          {/* Top header */}
+          <div
+            style={{
+              background: `linear-gradient(120deg, ${cardBgColor} 0%, #243b55 100%)`,
+              color: textColor,
+              borderRadius: 16,
+              padding: 16,
+              border: "1px solid rgba(255,255,255,.08)",
+              boxShadow: "0 10px 28px rgba(0,0,0,.18)",
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <div>
-                <h2 style={{ margin: "0 0 4px", fontWeight: 900 }}>
-                  {role === 'superadmin' ? 'Superadmin' : 'Admin'} Dashboard
+                <h2
+                  style={{
+                    margin: "0 0 4px",
+                    fontWeight: 900,
+                  }}
+                >
+                  {role === "superadmin"
+                    ? "Superadmin"
+                    : "Admin"}{" "}
+                  Dashboard
                 </h2>
-                <div style={{ opacity: 0.9, fontSize: 13 }}>
-                  Last updated: {at(Date.now())}{scopeCity ? ` • Scope: ${scopeCity}` : ''}
+                <div
+                  style={{ opacity: 0.9, fontSize: 13 }}
+                >
+                  Last updated: {at(Date.now())}
+                  {role === "admin" && scopeCity
+                    ? ` • Scope: ${scopeCity}`
+                    : ""}
+                  {role === "admin" && adminAddress
+                    ? ` • Area: ${adminAddress}`
+                    : ""}
                 </div>
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 16 }}>
-            {role === 'superadmin' && (
-              <Card icon={<FaMapMarkerAlt />} label="Areas" value={summary.areas} loading={loading} onClick={() => navigate("/manageareas")} />
+          {/* Cards */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 16,
+              marginBottom: 16,
+            }}
+          >
+            {role === "superadmin" && (
+              <Card
+                icon={<FaMapMarkerAlt />}
+                label="Areas"
+                value={summary.areas}
+                loading={loading}
+                onClick={() => navigate("/manageareas")}
+              />
             )}
-            <Card icon={<FaClock />} label="AreaWise Slots" value={summary.areaWiseSlots} loading={loading} onClick={() => navigate(role==='admin'?"/manageslots?scope=mine":"/manageslots")} />
-            <Card icon={<FaComments />} label="Feedback" value={summary.feedback} loading={loading} onClick={() => navigate("/AdminViewFeedback")} />
-            <Card icon={<FaEnvelope />} label="Franchise Leads" value={summary.contactus} loading={loading} onClick={() => navigate("/super/franchise")} />
-            <Card icon={<FaCalendarAlt />} label="Booking" value={summary.booking} loading={loading} onClick={() => navigate(role==='admin'?"/AdminBookingData?scope=mine":"/AdminBookingData")} />
-            <Card icon={<FaUserAlt />} label="Users" value={summary.users} loading={loading} onClick={() => navigate(role==='admin'?"/manageusers?scope=mine":"/manageusers")} />
+
+            <Card
+              icon={<FaClock />}
+              label={
+                role === "admin"
+                  ? "AreaWise Slots (Your Area)"
+                  : "AreaWise Slots"
+              }
+              value={summary.areaWiseSlots}
+              loading={loading}
+              onClick={() =>
+                navigate(
+                  role === "admin"
+                    ? "/manageslots?scope=mine"
+                    : "/manageslots"
+                )
+              }
+            />
+
+            <Card
+              icon={<FaComments />}
+              label="Feedback"
+              value={summary.feedback}
+              loading={loading}
+              onClick={() => navigate("/AdminViewFeedback")}
+            />
+
+            <Card
+              icon={<FaEnvelope />}
+              label="Franchise Leads"
+              value={summary.contactus}
+              loading={loading}
+              onClick={() => navigate("/super/franchise")}
+            />
+
+            <Card
+              icon={<FaCalendarAlt />}
+              label="Booking"
+              value={summary.booking}
+              loading={loading}
+              onClick={() =>
+                navigate(
+                  role === "admin"
+                    ? "/AdminBookingData?scope=mine"
+                    : "/AdminBookingData"
+                )
+              }
+            />
+
+            <Card
+              icon={<FaUserAlt />}
+              label="Users"
+              value={summary.users}
+              loading={loading}
+              onClick={() =>
+                navigate(
+                  role === "admin"
+                    ? "/manageusers?scope=mine"
+                    : "/manageusers"
+                )
+              }
+            />
           </div>
 
+          {/* Nested admin routes */}
           <div style={{ marginTop: 16 }}>
             <Outlet />
           </div>
