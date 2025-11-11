@@ -46,18 +46,6 @@ const CustomSnackbar = styled(Snackbar)({
   },
 });
 
-const SuccessAnimation = styled("div")({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  marginTop: "20px",
-  animation: "fadeIn 0.5s ease-in-out",
-  "@keyframes fadeIn": {
-    from: { opacity: 0, transform: "scale(0.5)" },
-    to: { opacity: 1, transform: "scale(1)" },
-  },
-});
 
 // Base API for all booking routes
 // If your env already includes /api/userapi, keep it consistent.

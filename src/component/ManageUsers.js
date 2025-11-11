@@ -17,8 +17,31 @@ const ManageUsers = () => {
   const UPDATE_URL = `http://localhost:5000/api/registeruserapi/updateRegisterUser`; // Update API URL
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.error("Token missing from localStorage");
+          return;
+        }
+
+        const response = await axios.get(API_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.data && Array.isArray(response.data.data)) {
+          const sortedData = response.data.data.sort((a, b) => a.user_id - b.user_id);
+          setData(sortedData);
+        } else {
+          console.error("Unexpected response structure:", response.data);
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error.response?.data || error.message);
+      }
+    };
+
     fetchData();
-  }, []);
+  }, [API_URL]);
 
   const fetchData = async () => {
     try {
@@ -43,13 +66,7 @@ const ManageUsers = () => {
     }
   };
 
-  const handleEditClick = (user) => {
-    setEditUser({ ...user });
-    setImageFile(null); // Reset the image file when editing
-    setShowEditModal(true);
-  };
-
-  const handleEditChange = (e) => {
+const handleEditChange = (e) => {
     const { name, value } = e.target;
     setEditUser((prev) => ({ ...prev, [name]: value }));
   };

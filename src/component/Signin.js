@@ -34,8 +34,22 @@ const Signin = () => {
     const num2 = Math.floor(Math.random() * 10) + 1;
     const ops = ["+", "-", "*"];
     const op = ops[Math.floor(Math.random() * ops.length)];
+    let answer;
     const expression = `${num1} ${op} ${num2}`;
-    const answer = eval(expression).toString();
+    
+    switch(op) {
+      case '+':
+        answer = (num1 + num2).toString();
+        break;
+      case '-':
+        answer = (num1 - num2).toString();
+        break;
+      case '*':
+        answer = (num1 * num2).toString();
+        break;
+      default:
+        answer = '0';
+    }
     setMathChallenge(expression);
     setCorrectAnswer(answer);
   };
