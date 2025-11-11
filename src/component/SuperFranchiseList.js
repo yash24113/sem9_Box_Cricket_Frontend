@@ -1,4 +1,3 @@
-// src/pages/admin/SuperFranchiseList.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -9,7 +8,8 @@ import AdminFooter from "./AdminFooter";
 import AdminSidebar from "./AdminSidebar";
 
 const RAW_API =
-  process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
+  process.env.REACT_APP_API_ROOT ||
+  "http://localhost:5000/api/userapi";
 const API = RAW_API.replace(/\/+$/, "");
 
 /* ---------- tiny helpers ---------- */
@@ -41,18 +41,17 @@ const StatusPill = ({ v }) => {
 const fmtMoney = (v) => (v === 0 || v ? `₹${v}` : "-");
 const nowIso = () => new Date().toISOString();
 
-/* ---------- local history (fallback) ---------- */
+/* ---------- local history ---------- */
 const LS_KEY = "franchiseApprovalHistory";
-function loadHistory() {
+const loadHistory = () => {
   try {
     return JSON.parse(localStorage.getItem(LS_KEY) || "[]");
   } catch {
     return [];
   }
-}
-function saveHistory(h) {
+};
+const saveHistory = (h) =>
   localStorage.setItem(LS_KEY, JSON.stringify(h));
-}
 
 /* ---------- shared user helper ---------- */
 function getStoredUser() {
@@ -115,7 +114,8 @@ const SuperFranchiseList = () => {
       localStorage.getItem("token") ||
       "";
     if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      axios.defaults.headers.common["Authorization"] =
+        `Bearer ${token}`;
     }
   }, []);
 
@@ -128,11 +128,23 @@ const SuperFranchiseList = () => {
       if (status) query.set("status", status);
       if (q.trim()) query.set("q", q.trim());
 
-      const r = await axios.get(`${API}/franchise/list?${query.toString()}`);
+      const url = `${API}/franchise/list${
+        query.toString() ? `?${query.toString()}` : ""
+      }`;
+
+      const r = await axios.get(url);
       setRows(r?.data?.data || []);
     } catch (err) {
-      console.error("franchise list error:", err);
-      toast.error("Failed to load leads");
+      console.error("franchise list error:", err?.message || err);
+      const sc = err?.response?.status;
+      if (sc === 404) {
+        toast.error(
+          "Franchise list endpoint (GET /franchise/list) not found. Check backend route prefix."
+        );
+      } else {
+        toast.error("Failed to load leads");
+      }
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -143,16 +155,19 @@ const SuperFranchiseList = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // actions
+  // approve
   const approve = async (id) => {
     try {
       setBusyId(id);
-      const res = await axios.put(`${API}/franchise/${id}/approve`, {
-        approvedBy: approverName,
-      });
+      const res = await axios.put(
+        `${API}/franchise/${id}/approve`,
+        { approvedBy: approverName }
+      );
 
       const lead =
-        res?.data?.data?.lead || rows.find((r) => r._id === id) || {};
+        res?.data?.data?.lead ||
+        rows.find((r) => r._id === id) ||
+        {};
 
       const entry = {
         leadId: id,
@@ -179,6 +194,7 @@ const SuperFranchiseList = () => {
     }
   };
 
+  // reject
   const reject = async (id) => {
     try {
       setBusyId(id);
@@ -197,13 +213,15 @@ const SuperFranchiseList = () => {
     if (row?.approvedBy) return row.approvedBy;
     const h = history.find((e) => e.leadId === row._id);
     if (h)
-      return `${h.approvedBy} (${new Date(h.approvedAt).toLocaleString()})`;
+      return `${h.approvedBy} (${new Date(
+        h.approvedAt
+      ).toLocaleString()})`;
     if (row?.createdAdminId)
       return "Admin created (approver not recorded)";
     return "—";
   };
 
-  // access gate
+  // gate: only superadmin
   if (!user || role !== "superadmin") {
     return (
       <div style={styles.pageContainer}>
@@ -216,17 +234,7 @@ const SuperFranchiseList = () => {
             background: "#f8fafc",
           }}
         >
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 16,
-              padding: 24,
-              maxWidth: 560,
-              textAlign: "center",
-              boxShadow: "0 10px 28px rgba(17,35,56,.10)",
-            }}
-          >
+          <div style={styles.forbiddenBox}>
             <h2 style={{ marginTop: 0 }}>403 — Not Authorized</h2>
             <p style={{ color: "#4b5563" }}>
               This page is visible to <b>Superadmin</b> only.
@@ -277,7 +285,10 @@ const SuperFranchiseList = () => {
               Search / Refresh
             </button>
             <button
-              style={{ ...styles.button, backgroundColor: "#795548" }}
+              style={{
+                ...styles.button,
+                backgroundColor: "#795548",
+              }}
               onClick={() => setHistoryOpen(true)}
             >
               View History
@@ -361,7 +372,9 @@ const SuperFranchiseList = () => {
                       <td style={styles.td}>{r.state}</td>
                       <td style={styles.td}>
                         {r.haveVenue
-                          ? `${r.venueType} • ${r.areaSqFt || 0} sqft`
+                          ? `${r.venueType} • ${
+                              r.areaSqFt || 0
+                            } sqft`
                           : "No"}
                       </td>
                       <td style={styles.td}>
@@ -460,8 +473,7 @@ const SuperFranchiseList = () => {
             </h2>
             <div
               style={{
-                border:
-                  "1px solid #e5e7eb",
+                border: "1px solid #e5e7eb",
                 borderRadius: 12,
                 overflow: "hidden",
               }}
@@ -476,7 +488,10 @@ const SuperFranchiseList = () => {
                       "Approved By",
                       "When",
                     ].map((h) => (
-                      <th key={h} style={styles.th}>
+                      <th
+                        key={h}
+                        style={styles.th}
+                      >
                         {h}
                       </th>
                     ))}
@@ -576,7 +591,7 @@ const SuperFranchiseList = () => {
   );
 };
 
-/* ------- styles ------- */
+/* ---------- styles ---------- */
 const styles = {
   pageContainer: {
     display: "flex",
@@ -715,6 +730,15 @@ const styles = {
     padding: "20px",
     fontStyle: "italic",
     color: "#999",
+  },
+  forbiddenBox: {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 560,
+    textAlign: "center",
+    boxShadow: "0 10px 28px rgba(17,35,56,.10)",
   },
 };
 
