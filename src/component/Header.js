@@ -1,166 +1,319 @@
-import React, { useState } from "react";
+// src/components/Header.jsx
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import Snackbar from "@mui/material/Snackbar";
-import MuiAlert from "@mui/material/Alert";
-import Modal from "@mui/material/Modal";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import MenuIcon from "@mui/icons-material/Menu";
-import CloseIcon from "@mui/icons-material/Close";
-import logo from "../assets/logo.png";
-import "../Header.css";
 
-const Alert = React.forwardRef(function Alert(props, ref) {
-  return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
-});
+const fallbackAvatar =
+  "https://ui-avatars.com/api/?name=User&background=random&bold=true";
+const logoUrl =
+  "https://png.pngtree.com/png-clipart/20240718/original/pngtree-cricket-logo-player-bat-boll-and-stump-png-image_15581859.png";
 
-const Header = () => {
+export default function Header() {
+  const [user, setUser] = useState(null);
+  const [open, setOpen] = useState(false);           // controls dropdown/drawer
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined"
+      ? window.matchMedia("(max-width: 860px)").matches
+      : false
+  );
+
+  const ref = useRef(null); // desktop dropdown anchor
   const navigate = useNavigate();
   const location = useLocation();
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-  const [logoutModal, setLogoutModal] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const token = localStorage.getItem("token");
-  const loggedInUser = localStorage.getItem("loggedInUser");
-  const isAuthenticated = Boolean(token && loggedInUser);
+  /* ---------- auth bootstrap ---------- */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("loggedInUser");
+      const parsed = raw ? JSON.parse(raw) : null;
+      const u = parsed?.user || parsed?.data || parsed || null;
+      setUser(u);
+    } catch {
+      setUser(null);
+    }
+  }, []);
 
-  const handleLogout = () => {
+  /* ---------- responsive watcher ---------- */
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 860px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener?.("change", onChange);
+    mq.addListener?.(onChange); // Safari fallback
+    return () => {
+      mq.removeEventListener?.("change", onChange);
+      mq.removeListener?.(onChange);
+    };
+  }, []);
+
+  /* ---------- close on outside click / esc (desktop only) ---------- */
+  useEffect(() => {
+    const onClick = (e) => {
+      if (!isMobile && ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isMobile]);
+
+  /* ---------- close drawer on route change ---------- */
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  /* ---------- nav items ---------- */
+  const menuLogged = [
+    { to: "/", label: "Home" },
+    { to: "/about", label: "About" },
+    { to: "/arealist", label: "Area" },
+    { to: "/gallery", label: "Gallery" },
+    { to: "/contact", label: "Contact Us" },
+  ];
+  const menuGuest = [
+    { to: "/", label: "Home" },
+    { to: "/about", label: "About" },
+    { to: "/gallery", label: "Gallery" },
+    { to: "/arealist", label: "Area" },
+  ];
+  const items = user ? menuLogged : menuGuest;
+
+  /* ---------- actions ---------- */
+  const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("loggedInUser");
-    setSnackbar({ open: true, message: "Logged out successfully!", severity: "success" });
-    setLogoutModal(false);
-    setSidebarOpen(false);
-    setTimeout(() => navigate("/Signin"), 1500);
+    setUser(null);
+    setOpen(false);
+    navigate("/");
   };
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
-  const isActive = (path) => location.pathname === path;
+  const imgSrc = user?.profile_image || fallbackAvatar;
+  const isActive = (path) => (path === "/" ? location.pathname === "/" : location.pathname.startsWith(path));
 
   return (
-    <nav className="navbar">
-      <div className="navbar-container">
-        {/* Logo */}
-        <div className="logo">
-          <Link to="/">
-            <img src={logo} alt="Logo" />
+    <header style={styles.shell}>
+      <style>{css}</style>
+
+      {/* Left: Logo + Brand */}
+      <Link to="/" className="brand" aria-label="Box Cricket Home">
+        <img src={logoUrl} alt="Logo" className="brand-logo" />
+        <span className="brand-name">Box Cricket</span>
+      </Link>
+
+      {/* Center: Nav (hidden on mobile) */}
+      <nav className="nav-center">
+        {items.map(({ to, label }) => (
+          <Link
+            key={to}
+            to={to}
+            className={`nav-link ${isActive(to) ? "active" : ""}`}
+          >
+            {label}
           </Link>
-        </div>
+        ))}
+      </nav>
 
-        {/* Menu Button (Mobile View) */}
-        <div className="menu-icon" onClick={toggleSidebar}>
-          {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-        </div>
+      {/* Right: Profile (button always at right) */}
+      <div ref={ref} className="profile-wrap">
+        <button
+          onClick={() => setOpen((s) => !s)}
+          aria-label="profile menu"
+          className="profile-btn"
+        >
+          <img
+            src={imgSrc}
+            onError={(e) => (e.currentTarget.src = fallbackAvatar)}
+            alt="profile"
+            className="avatar"
+            width={36}
+            height={36}
+          />
+          <span className="profile-name">
+            {user ? `${user.fname || ""} ${user.lname || ""}`.trim() : "Guest User"}
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" className="chev" aria-hidden>
+            <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+          </svg>
+        </button>
 
-        {/* Desktop Nav */}
-        <ul className="nav-links">
-          <li>
-            <Link to="/" className={`nav-item ${isActive("/") ? "active" : ""}`}>Home</Link>
-          </li>
-          <li>
-            <Link to="/about" className={`nav-item ${isActive("/about") ? "active" : ""}`}>About</Link>
-          </li>
-          <li>
-            <Link to="/gallery" className={`nav-item ${isActive("/gallery") ? "active" : ""}`}>Gallery</Link>
-          </li>
-          <li>
-            <Link to="/arealist" className={`nav-item ${isActive("/arealist") ? "active" : ""}`}>Area</Link>
-          </li>
-
-          {isAuthenticated && (
-            <>
-              <li>
-                <Link to="/contact" className={`nav-item ${isActive("/contact") ? "active" : ""}`}>ContactUs</Link>
-              </li>
-              <li>
-                <Link to="/feedback" className={`nav-item ${isActive("/feedback") ? "active" : ""}`}>Feedback</Link>
-              </li>
-              <li>
-                <Link to="/userbooking" className={`nav-item ${isActive("/userbooking") ? "active" : ""}`}>MyBooking</Link>
-              </li>
-              <li>
-                <Link to="/profile" className={`nav-item ${isActive("/profile") ? "active" : ""}`}>Profile</Link>
-              </li>
-            </>
-          )}
-        </ul>
-
-        {/* Auth Buttons (Desktop) */}
-        <div className="auth-buttons">
-          {isAuthenticated ? (
-            <button className="btn logout" onClick={() => setLogoutModal(true)}>Logout</button>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "10px" }}>
-              <Link to="/Signin" className="btn login">Login</Link>
-              <Link to="/Login" className="btn signup">Signup</Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Sidebar (Mobile View) */}
-      <div className={`mobile-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <ul>
-          <li><Link to="/" className={isActive("/") ? "active" : ""} onClick={toggleSidebar}>Home</Link></li>
-          <li><Link to="/about" className={isActive("/about") ? "active" : ""} onClick={toggleSidebar}>About</Link></li>
-          <li><Link to="/gallery" className={isActive("/gallery") ? "active" : ""} onClick={toggleSidebar}>Gallery</Link></li>
-          <li><Link to="/arealist" className={isActive("/arealist") ? "active" : ""} onClick={toggleSidebar}>Area</Link></li>
-
-          {isAuthenticated && (
-            <>
-              <li><Link to="/contact" className={isActive("/contact") ? "active" : ""} onClick={toggleSidebar}>ContactUs</Link></li>
-              <li><Link to="/feedback" className={isActive("/feedback") ? "active" : ""} onClick={toggleSidebar}>Feedback</Link></li>
-              <li><Link to="/userbooking" className={isActive("/userbooking") ? "active" : ""} onClick={toggleSidebar}>MyBooking</Link></li>
-              <li><Link to="/profile" className={isActive("/profile") ? "active" : ""} onClick={toggleSidebar}>Profile</Link></li>
-            </>
-          )}
-
-          <li className="sidebar-auth">
-            {isAuthenticated ? (
-              <button onClick={() => setLogoutModal(true)}>Logout</button>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
-                <Link to="/Signin" onClick={toggleSidebar}>Login</Link>
-                <Link to="/Login" onClick={toggleSidebar}>Signup</Link>
+        {/* Desktop dropdown */}
+        {!isMobile && open && (
+          <div role="menu" className="dropdown">
+            <div className="drop-head">
+              <div className="drop-user">
+                <img
+                  src={imgSrc}
+                  onError={(e) => (e.currentTarget.src = fallbackAvatar)}
+                  alt="profile"
+                  className="avatar big"
+                />
+                <div>
+                  <div className="u-name">{user ? `${user.fname || ""} ${user.lname || ""}`.trim() : "Guest"}</div>
+                  <div className="u-email">{user?.email || "—"}</div>
+                </div>
               </div>
-            )}
-          </li>
-        </ul>
+            </div>
+
+            <div className="drop-actions">
+              {user ? (
+                <>
+                  <Link to="/userbooking" className="drop-item" onClick={() => setOpen(false)}>My Bookings</Link>
+                  <Link to="/profile" className="drop-item" onClick={() => setOpen(false)}>My Account</Link>
+                  <button onClick={logout} className="drop-item danger">Logout</button>
+                </>
+              ) : (
+                <>
+                  <Link to="/Signin" className="drop-item primary" onClick={() => setOpen(false)}>Sign in</Link>
+                  <Link to="/Register" className="drop-item" onClick={() => setOpen(false)}>Create account</Link>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Logout Confirmation Modal */}
-      <Modal open={logoutModal} onClose={() => setLogoutModal(false)}>
-        <Box sx={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: 300,
-          bgcolor: "background.paper",
-          borderRadius: 2,
-          boxShadow: 24,
-          p: 3,
-          textAlign: "center"
-        }}>
-          <h3>Are you sure you want to logout?</h3>
-          <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mt: 2 }}>
-            <Button variant="contained" color="error" onClick={handleLogout}>Yes</Button>
-            <Button variant="outlined" onClick={() => setLogoutModal(false)}>No</Button>
-          </Box>
-        </Box>
-      </Modal>
+      {/* Mobile drawer (right side) */}
+      {isMobile && (
+        <>
+          {/* Backdrop */}
+          <div
+            className={`drawer-backdrop ${open ? "show" : ""}`}
+            onClick={() => setOpen(false)}
+          />
+          {/* Drawer */}
+          <aside className={`drawer ${open ? "open" : ""}`} aria-hidden={!open}>
+            <div className="drawer-head">
+              <img
+                src={imgSrc}
+                onError={(e) => (e.currentTarget.src = fallbackAvatar)}
+                alt="profile"
+                className="avatar big"
+              />
+              <div>
+                <div className="u-name">{user ? `${user.fname || ""} ${user.lname || ""}`.trim() : "Guest"}</div>
+                <div className="u-email">{user?.email || "—"}</div>
+              </div>
+              <button className="drawer-close" onClick={() => setOpen(false)} aria-label="Close menu">×</button>
+            </div>
 
-      {/* Snackbar Notification */}
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: "300px", fontSize: "16px" }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </nav>
+            {/* Mobile nav list */}
+            <nav className="drawer-nav">
+              {items.map(({ to, label }) => (
+                <Link key={to} to={to} className="drawer-link" onClick={() => setOpen(false)}>
+                  {label}
+                </Link>
+              ))}
+            </nav>
+
+            {/* Divider */}
+            <div className="drawer-divider" />
+
+            {/* Actions */}
+            <div className="drawer-actions">
+              {user ? (
+                <>
+                  <Link to="/userbooking" className="drawer-link" onClick={() => setOpen(false)}>My Bookings</Link>
+                  <Link to="/profile" className="drawer-link" onClick={() => setOpen(false)}>My Account</Link>
+                  <button className="drawer-link danger" onClick={logout}>Logout</button>
+                </>
+              ) : (
+                <>
+                  <Link to="/Signin" className="drawer-link primary" onClick={() => setOpen(false)}>Sign in</Link>
+                  <Link to="/Register" className="drawer-link" onClick={() => setOpen(false)}>Create account</Link>
+                </>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
+    </header>
   );
+}
+
+/* ---------- styles ---------- */
+const styles = {
+  shell: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    alignItems: "center",
+    gap: 12,
+    padding: "10px 16px",
+    background: "#0b7a10",
+    color: "#fff",
+    position: "sticky",
+    top: 0,
+    zIndex: 100,
+  },
 };
 
-export default Header;
+const css = `
+/* brand */
+.brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:#fff}
+.brand-logo{width:34px; height:34px; object-fit:contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,.2))}
+.brand-name{font-weight:800; letter-spacing:.2px; font-size: clamp(16px, 2.2vw, 20px)}
+
+/* center nav (hidden on mobile) */
+.nav-center{display:flex; align-items:center; justify-content:center; gap:10px}
+.nav-link{color:#eaffea; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px; opacity:.95; transition: background .2s, color .2s, transform .12s}
+.nav-link:hover{background: rgba(255,255,255,.18); color:#fff; transform: translateY(-1px)}
+.nav-link.active{background:#ffffff; color:#0b7a10}
+
+/* profile */
+.profile-wrap{position:relative}
+.profile-btn{border:0; background:transparent; display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff}
+.avatar{border-radius:50%; object-fit:cover; border:2px solid #fff; width:36px; height:36px}
+.avatar.big{width:44px; height:44px; border-width:3px}
+.profile-name{font-weight:700; display:none}
+.chev{opacity:.9}
+
+/* desktop dropdown */
+.dropdown{position:absolute; right:0; margin-top:8px; background:#fff; color:#222; border-radius:12px; box-shadow:0 16px 40px rgba(0,0,0,.2); min-width:260px; overflow:hidden; border:1px solid #e8e8e8}
+.drop-head{padding:12px; border-bottom:1px solid #f0f0f0; background: linear-gradient(180deg,#ffffff,#f7fff7)}
+.drop-user{display:flex; align-items:center; gap:10px}
+.u-name{font-weight:800; font-size:14px; color:#0b7a10}
+.u-email{font-size:12px; color:#666}
+.drop-actions{display:flex; flex-direction:column; padding:6px}
+.drop-item{display:block; padding:10px 12px; color:#222; text-decoration:none; background:#fff; border:0; cursor:pointer; font-weight:600; border-radius:8px; margin:2px 4px}
+.drop-item:hover{background:#f3fff3}
+.drop-item.primary{background:#0b7a10; color:#fff; text-align:center}
+.drop-item.primary:hover{background:#0a6d0e}
+.drop-item.danger, .drawer-link.danger{color:#b91c1c; text-align:left}
+
+/* MOBILE drawer */
+.drawer-backdrop{
+  position: fixed; inset: 0; background: rgba(0,0,0,.35);
+  opacity: 0; pointer-events: none; transition: opacity .25s ease; z-index: 99;
+}
+.drawer-backdrop.show{opacity:1; pointer-events:auto}
+
+.drawer{
+  position: fixed; top: 0; right: 0; height: 100%; width: 86%;
+  max-width: 360px; background: #fff; color:#0b1224; z-index: 100;
+  box-shadow: -10px 0 40px rgba(0,0,0,.25);
+  transform: translateX(100%); transition: transform .28s cubic-bezier(.32,.72,.25,1);
+  display:flex; flex-direction:column;
+}
+.drawer.open{transform: translateX(0)}
+
+.drawer-head{
+  display:flex; align-items:center; gap:10px; padding:14px;
+  border-bottom:1px solid #efefef; background: linear-gradient(180deg,#ffffff,#f6fff6);
+}
+.drawer-close{
+  margin-left:auto; font-size:28px; line-height:1; border:0; background:transparent; cursor:pointer; color:#0b7a10;
+}
+.drawer-nav, .drawer-actions{display:flex; flex-direction:column; padding:8px}
+.drawer-link{
+  display:block; padding:12px 14px; text-decoration:none; color:#1f2937; border-radius:10px; font-weight:700; margin:2px 6px;
+}
+.drawer-link:hover{background:#f3fff3}
+.drawer-link.primary{background:#0b7a10; color:#fff; text-align:center}
+.drawer-divider{height:1px; background:#eee; margin:6px 0}
+
+/* responsive */
+@media (min-width: 860px){
+  .profile-name{display:inline}
+}
+@media (max-width: 860px){
+  .nav-center{display:none} /* hide center nav; use drawer instead */
+}
+`;

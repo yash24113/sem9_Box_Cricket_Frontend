@@ -207,7 +207,7 @@ const Signin = () => {
           <p style={{ marginTop: 10 }}>
             Don&apos;t have an account?{" "}
             <Link
-              to="/signup"
+              to="/Login"
               style={{ color: "#007bff", textDecoration: "none" }}
             >
               Signup here
