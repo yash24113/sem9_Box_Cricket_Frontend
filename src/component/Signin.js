@@ -106,7 +106,7 @@ const Signin = () => {
       // Backend decides; fallback via role
       const nextPath =
         redirectTo ||
-        (role === "superadmin" || role === "admin" ? "/admin" : "/");
+        (role === "superadmin" || role === "admin" ? "/admin" : "/profile");
 
       setTimeout(() => {
         setLoading(false);
