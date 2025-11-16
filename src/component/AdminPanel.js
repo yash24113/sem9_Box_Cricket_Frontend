@@ -166,57 +166,67 @@ const AdminPanel = () => {
   }, [user, role, navigate]);
 
   // Load summary (with special handling for admin areaWiseSlots)
-  useEffect(() => {
-    let cancelled = false;
+// Load summary with booking filtered same as AdminBookingData
+useEffect(() => {
+  let cancelled = false;
 
-    (async () => {
-      if (!user) return;
-      setLoading(true);
+  (async () => {
+    if (!user) return;
+    setLoading(true);
 
-      try {
-        // Base summary (superadmin: all, admin: city-scoped if you use that backend filter)
-        let baseSummary =
-          role === "admin"
-            ? await getScopedSummary(scopeCity)
-            : await getScopedSummary("");
+    try {
+      // Step 1: Base summary (superadmin = all, admin = city-scoped)
+      let baseSummary =
+        role === "admin"
+          ? await getScopedSummary(scopeCity)
+          : await getScopedSummary("");
 
-        // For admin: override areaWiseSlots using admin.address
-        if (role === "admin" && adminAddress) {
-          const addrNorm = adminAddress.toLowerCase();
+      // Step 2: Fetch bookings + areas to apply ADMIN area filter
+      const [bookingRes, areaRes] = await Promise.all([
+        axios.get(`${API_ROOT}/viewBooking`),
+        axios.get(`${process.env.REACT_APP_API_BASE_URL}/viewArea`)
+      ]);
 
-          const slotsRes = await axios.get(
-            `${API_ROOT}/viewAreaWiseSlot`
+      const allBookings = bookingRes?.data?.data || [];
+      const allAreas = areaRes?.data?.data || [];
+
+      let bookingCount = allBookings.length;
+
+      if (role === "admin" && adminAddress) {
+        bookingCount = allBookings.filter((b) => {
+          const bookingArea = allAreas.find(
+            (a) => String(a._id) === String(b.area_id)
           );
-          const allSlots = slotsRes?.data?.data || [];
-
-          const scopedCount = allSlots.filter((slot) => {
-            const areaName = (slot.area?.area_name || "")
-              .trim()
-              .toLowerCase();
-            return areaName && areaName === addrNorm;
-          }).length;
-
-          baseSummary = {
-            ...baseSummary,
-            areaWiseSlots: scopedCount,
-          };
-        }
-
-        if (!cancelled) {
-          setSummary(baseSummary || {});
-        }
-      } catch (err) {
-        console.warn("admin panel summary load error:", err);
-        if (!cancelled) setSummary({});
-      } finally {
-        if (!cancelled) setLoading(false);
+          return (
+            bookingArea &&
+            String(bookingArea.area_name).trim().toLowerCase() ===
+              String(adminAddress).trim().toLowerCase()
+          );
+        }).length;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [user, role, scopeCity, adminAddress]);
+      // Step 3: Override booking count inside summary
+      baseSummary = {
+        ...baseSummary,
+        booking: bookingCount,
+      };
+
+      if (!cancelled) {
+        setSummary(baseSummary || {});
+      }
+    } catch (err) {
+      console.warn("admin panel summary load error:", err);
+      if (!cancelled) setSummary({});
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [user, role, scopeCity, adminAddress]);
+
 
   const at = (ts) => new Date(ts).toLocaleString();
   const cardBgColor =

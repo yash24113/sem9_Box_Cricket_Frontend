@@ -254,7 +254,7 @@ const css = `
 /* center nav (hidden on mobile) */
 .nav-center{display:flex; align-items:center; justify-content:center; gap:10px}
 .nav-link{color:#eaffea; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px; opacity:.95; transition: background .2s, color .2s, transform .12s}
-.nav-link:hover{background: rgba(255,255,255,.18); color:#fff; transform: translateY(-1px)}
+.nav-link:hover{text-decoration:none,background: rgba(255,255,255,.18); color:#fff; transform: translateY(-1px)}
 .nav-link.active{background:#ffffff; color:#0b7a10}
 
 /* profile */
