@@ -37,79 +37,111 @@ const AdminBookingData = () => {
 
   // Logged-in user
   const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser"));
-  const userRole = loggedInUser?.role;
-  const adminAddress = loggedInUser?.address; // area_name
+  const userRole = loggedInUser?.role || "superadmin"; // default fallback
+  const adminAddress = (loggedInUser?.address || "").trim().toLowerCase();
+
+  const API_BASE =
+    process.env.REACT_APP_API_BASE_URL ||
+    "http://localhost:5000/api/userapi";
 
   useEffect(() => {
     fetchAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllData = async () => {
     try {
       const [bookingRes, slotRes, areaRes, userRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/userapi/viewBooking"),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL}/viewAreaWiseSlot`),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL}/viewArea`),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL}/viewUser`),
+        axios.get(`${API_BASE}/viewBooking`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          },
+        }),
+        axios.get(`${API_BASE}/viewAreaWiseSlot`),
+        axios.get(`${API_BASE}/viewArea`),
+        axios.get(`${API_BASE}/viewUser`),
       ]);
 
       let fetchedBookings = bookingRes.data?.data || [];
       const allAreas = areaRes.data?.data || [];
 
       // ROLE-BASED FILTERING
-      if (userRole === "admin") {
+      if (userRole === "admin" && adminAddress) {
         fetchedBookings = fetchedBookings.filter((b) => {
-          const bookingArea = allAreas.find(
+          // try match via area_id -> Area collection
+          const areaFromCollection = allAreas.find(
             (a) => String(a._id) === String(b.area_id)
           );
-          return bookingArea && bookingArea.area_name === adminAddress;
+
+          const areaNameFromCollection =
+            areaFromCollection?.area_name || "";
+
+          const areaNameFromBooking = b.area_name || "";
+
+          const effectiveAreaName = (
+            areaNameFromCollection || areaNameFromBooking
+          )
+            .trim()
+            .toLowerCase();
+
+          return effectiveAreaName && effectiveAreaName === adminAddress;
         });
       }
 
       setBookings(fetchedBookings);
-      setSlots(slotRes.data.data || []);
+      setSlots(slotRes.data?.data || []);
       setAreas(allAreas);
-      setUsers(userRes.data.data || []);
+      setUsers(userRes.data?.data || []);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Error fetching admin booking data:", err);
     } finally {
       setLoading(false);
     }
   };
 
   // ADMIN / SUPERADMIN CANCEL API
- const handleCancelBooking = async () => {
-  try {
-    if (!selectedBooking?._id) return;
+  const handleCancelBooking = async () => {
+    try {
+      if (!selectedBooking?._id) return;
 
-    await axios.delete(
-      `http://localhost:5000/api/userapi/admin-cancel-booking/${selectedBooking._id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+      await axios.delete(
+        `${API_BASE}/admin-cancel-booking/${selectedBooking._id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    setBookings(prev => prev.filter(b => b._id !== selectedBooking._id));
-    setOpenDialog(false);
-    setOpenSnackbar(true);
-
-  } catch (error) {
-    console.error("Admin cancel booking error:", error);
-    alert("Failed to cancel booking. Check console.");
-  }
-};
-
+      setBookings((prev) =>
+        prev.filter((b) => b._id !== selectedBooking._id)
+      );
+      setOpenDialog(false);
+      setOpenSnackbar(true);
+    } catch (error) {
+      console.error("Admin cancel booking error:", error);
+      alert("Failed to cancel booking. Check console.");
+    }
+  };
 
   const findSlotInfo = (slotId) =>
-    slots.find((s) => s._id === (slotId?._id || slotId));
+    slots.find((s) => String(s._id) === String(slotId?._id || slotId));
 
-  const findAreaName = (slot) => {
-    if (!slot) return "N/A";
-    const area = areas.find((a) => String(a._id) === String(slot.area));
-    return area?.area_name || "N/A";
+  // ✅ FIX: get area name directly from booking.area_id / booking.area_name
+  const findAreaName = (booking) => {
+    if (!booking) return "N/A";
+
+    const areaFromCollection = areas.find(
+      (a) => String(a._id) === String(booking.area_id)
+    );
+
+    // Priority: Area collection → booking.area_name → fallback
+    return (
+      areaFromCollection?.area_name ||
+      booking.area_name ||
+      "N/A"
+    );
   };
 
   const findUserInfo = (userId) =>
@@ -135,7 +167,7 @@ const AdminBookingData = () => {
           <h2 style={styles.heading}>
             {userRole === "superadmin"
               ? "All Bookings"
-              : "Bookings of My Area"}
+              : `Bookings of My Area (${loggedInUser?.address || "N/A"})`}
           </h2>
 
           <div style={styles.tableWrapper}>
@@ -159,17 +191,28 @@ const AdminBookingData = () => {
                 {bookings.length > 0 ? (
                   bookings.map((booking, i) => {
                     const slot = findSlotInfo(booking.slot_id);
-                    const areaName = findAreaName(slot);
+                    const areaName = findAreaName(booking);
                     const user = findUserInfo(booking.user_id);
 
                     return (
-                      <tr key={i} style={i % 2 === 0 ? styles.evenRow : styles.oddRow}>
-                        <td style={styles.td}>{user ? `${user.fname} ${user.lname}` : "N/A"}</td>
-                        <td style={styles.td}>{user?.email}</td>
-                        <td style={styles.td}>{user?.mobile}</td>
+                      <tr
+                        key={booking._id || i}
+                        style={i % 2 === 0 ? styles.evenRow : styles.oddRow}
+                      >
+                        <td style={styles.td}>
+                          {user
+                            ? `${user.fname || ""} ${user.lname || ""}`.trim()
+                            : "N/A"}
+                        </td>
+                        <td style={styles.td}>{user?.email || booking.email}</td>
+                        <td style={styles.td}>{user?.mobile || booking.mobile}</td>
                         <td style={styles.td}>{areaName}</td>
                         <td style={styles.td}>
-                          {slot ? `${slot.slot_start_time} - ${slot.slot_end_time}` : "N/A"}
+                          {slot
+                            ? `${slot.slot_start_time} - ${slot.slot_end_time}`
+                            : booking.start_time && booking.end_time
+                            ? `${booking.start_time} - ${booking.end_time}`
+                            : "N/A"}
                         </td>
                         <td style={styles.td}>
                           {new Date(booking.date).toLocaleDateString()}
