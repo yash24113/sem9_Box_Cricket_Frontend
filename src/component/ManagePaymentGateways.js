@@ -1,4 +1,4 @@
-// src/pages/admin/ManageAdmins.jsx
+// src/pages/admin/ManagePaymentGateways.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import AdminHeader from "./AdminHeader";
@@ -10,7 +10,6 @@ import "react-toastify/dist/ReactToastify.css";
 const API =
   process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
 
-/* --- small atoms (styled to blend with ManageUsers page) --- */
 const Field = ({ label, children }) => (
   <label style={{ display: "grid", gap: 6 }}>
     <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>
@@ -27,7 +26,22 @@ const Input = (props) => (
       padding: "10px",
       border: "1px solid #ccc",
       borderRadius: "5px",
-      fontSize: "16px",
+      fontSize: "14px",
+      ...props.style,
+    }}
+  />
+);
+
+const Textarea = (props) => (
+  <textarea
+    {...props}
+    style={{
+      padding: "10px",
+      border: "1px solid #ccc",
+      borderRadius: "5px",
+      fontSize: "14px",
+      minHeight: "60px",
+      resize: "vertical",
       ...props.style,
     }}
   />
@@ -40,37 +54,39 @@ const Select = (props) => (
       padding: "10px",
       border: "1px solid #ccc",
       borderRadius: "5px",
-      fontSize: "16px",
+      fontSize: "14px",
       background: "#fff",
       ...props.style,
     }}
   />
 );
 
-const ManageAdmins = () => {
-  // ---- auth / role gate (supports many shapes of loggedInUser)
+const Checkbox = ({ label, ...props }) => (
+  <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <input type="checkbox" {...props} />
+    <span style={{ fontSize: 13 }}>{label}</span>
+  </label>
+);
+
+const ManagePaymentGateways = () => {
+  // ---- auth / role gate (same pattern as ManageAdmins)
   const loginBlob = useMemo(() => {
     try {
       const raw = localStorage.getItem("loggedInUser") || "{}";
       return JSON.parse(raw);
     } catch {
-      // if loggedInUser is just a plain string (email), return that string
       const raw = localStorage.getItem("loggedInUser");
       return raw || {};
     }
   }, []);
 
-  // Normalize out what "current user" is
   const currentUser = useMemo(() => {
     if (!loginBlob) return null;
-
-    // if it’s a simple string, treat as email
     if (typeof loginBlob === "string") return loginBlob;
 
     if (loginBlob?.data?.user) return loginBlob.data.user;
     if (loginBlob?.user) return loginBlob.user;
     if (loginBlob?.data) return loginBlob.data;
-
     return loginBlob;
   }, [loginBlob]);
 
@@ -87,36 +103,31 @@ const ManageAdmins = () => {
   const isSuperadmin =
     normalizedRole === "superadmin" || email === "superadmin@gmail.com";
 
-  // Uncomment this if you want to debug once:
-  // console.log("loginBlob:", loginBlob, "currentUser:", currentUser, "email:", email, "role:", normalizedRole);
-
   // ---- state
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [q, setQ] = useState("");
-  const [city, setCity] = useState("");
-  const [stateName, setStateName] = useState("");
-
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRow, setEditRow] = useState(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createData, setCreateData] = useState({
-    fname: "",
-    lname: "",
-    email: "",
-    mobile: "",
-    gender: "Male",
-    city: "",
-    state: "",
-    address: "",
-    password: "123",
+    name: "",
+    providerKey: "stripe",
+    logoUrl: "",
+    description: "",
+    publicKey: "",
+    mode: "test",
+    currency: "INR",
+    isActive: true,
+    isDefault: false,
+    sortOrder: 0,
   });
 
   const [busyId, setBusyId] = useState(null);
 
-  // token header (same approach as other pages)
+  // token header
   useEffect(() => {
     const token =
       localStorage.getItem("adminToken") ||
@@ -127,17 +138,23 @@ const ManageAdmins = () => {
     }
   }, []);
 
+  // ---- CRUD calls
   const fetchRows = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (q.trim()) params.set("q", q.trim());
-      if (city.trim()) params.set("city", city.trim());
-      if (stateName.trim()) params.set("state", stateName.trim());
-      const r = await axios.get(`${API}/admins?${params.toString()}`);
-      setRows(r?.data?.data || []);
+      const res = await axios.get(`${API}/payment-gateways`);
+      let data = res?.data?.data || [];
+      if (q.trim()) {
+        const query = q.trim().toLowerCase();
+        data = data.filter(
+          (g) =>
+            String(g.name || "").toLowerCase().includes(query) ||
+            String(g.providerKey || "").toLowerCase().includes(query)
+        );
+      }
+      setRows(data);
     } catch (e) {
-      toast.error("Failed to load admins");
+      toast.error("Failed to load payment gateways");
     } finally {
       setLoading(false);
     }
@@ -148,7 +165,6 @@ const ManageAdmins = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- actions
   const openEdit = (row) => {
     setEditRow({ ...row });
     setShowEditModal(true);
@@ -159,55 +175,56 @@ const ManageAdmins = () => {
     try {
       setBusyId(editRow._id);
       const payload = {
-        fname: editRow.fname || "",
-        lname: editRow.lname || "",
-        mobile: editRow.mobile || "",
-        gender: editRow.gender || "Male",
-        city: editRow.city || "",
-        state: editRow.state || "",
-        address: editRow.address || "",
-        role: "admin",
+        name: editRow.name,
+        providerKey: editRow.providerKey,
+        logoUrl: editRow.logoUrl,
+        description: editRow.description,
+        publicKey: editRow.publicKey,
+        mode: editRow.mode,
+        currency: editRow.currency,
+        isActive: !!editRow.isActive,
+        isDefault: !!editRow.isDefault,
+        sortOrder: Number(editRow.sortOrder || 0),
       };
-      await axios.put(`${API}/admins/${editRow._id}`, payload);
-      toast.success("Admin updated");
+
+      const res = await axios.put(
+        `${API}/payment-gateways/${editRow._id}`,
+        payload
+      );
+      toast.success(res?.data?.message || "Payment gateway updated");
       setShowEditModal(false);
       fetchRows();
-    } catch {
-      toast.error("Update failed");
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        "Update failed";
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
   };
 
-  const resetPassword = async (id) => {
-    if (!window.confirm("Reset password to '123' for this admin?")) return;
+  const removeGateway = async (id) => {
+    if (!window.confirm("Delete this payment gateway?")) return;
     try {
       setBusyId(id);
-      await axios.put(`${API}/admins/${id}/reset-password`);
-      toast.success("Password reset to '123'");
-    } catch {
-      toast.error("Reset failed");
+      const res = await axios.delete(`${API}/payment-gateways/${id}`);
+      toast.success(res?.data?.message || "Payment gateway deleted");
+      setRows((xs) => xs.filter((g) => g._id !== id));
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        "Delete failed";
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
   };
 
-  const removeAdmin = async (id) => {
-    if (!window.confirm("Delete this admin permanently?")) return;
-    try {
-      setBusyId(id);
-      await axios.delete(`${API}/admins/${id}`);
-      toast.success("Admin deleted");
-      setRows((x) => x.filter((r) => r._id !== id));
-    } catch {
-      toast.error("Delete failed");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const createAdmin = async () => {
-    const required = ["fname", "email", "password"];
+  const createGateway = async () => {
+    const required = ["name", "providerKey"];
     const missing = required.filter(
       (k) => !String(createData[k] || "").trim()
     );
@@ -217,26 +234,32 @@ const ManageAdmins = () => {
     }
     try {
       setBusyId("create");
-      await axios.post(`${API}/admins`, {
+      const payload = {
         ...createData,
-        role: "admin",
-      });
-      toast.success("Admin created");
+        sortOrder: Number(createData.sortOrder || 0),
+      };
+      const res = await axios.post(`${API}/payment-gateways`, payload);
+      toast.success(res?.data?.message || "Payment gateway created");
       setShowCreateModal(false);
       setCreateData({
-        fname: "",
-        lname: "",
-        email: "",
-        mobile: "",
-        gender: "Male",
-        city: "",
-        state: "",
-        address: "",
-        password: "123",
+        name: "",
+        providerKey: "stripe",
+        logoUrl: "",
+        description: "",
+        publicKey: "",
+        mode: "test",
+        currency: "INR",
+        isActive: true,
+        isDefault: false,
+        sortOrder: 0,
       });
       fetchRows();
     } catch (e) {
-      toast.error(e?.response?.data?.error || "Create failed");
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        "Create failed";
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
@@ -282,37 +305,25 @@ const ManageAdmins = () => {
       <AdminHeader />
 
       <div style={styles.mainContent}>
-        {/* Sidebar (same placement as ManageUsers) */}
         <AdminSidebar />
 
-        {/* Main container */}
         <div style={styles.container}>
-          <h1 style={styles.heading}>Manage Admins</h1>
+          <h1 style={styles.heading}>Manage Payment Gateways</h1>
 
-          {/* Filters */}
+          {/* Filters + Actions */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr auto auto",
+              gridTemplateColumns: "1fr auto auto",
               gap: 10,
               marginBottom: 12,
             }}
           >
             <Input
-              placeholder="Search by name / email / phone"
+              placeholder="Search by name or provider key"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{ width: "100%" }}
-            />
-            <Input
-              placeholder="City"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-            />
-            <Input
-              placeholder="State"
-              value={stateName}
-              onChange={(e) => setStateName(e.target.value)}
             />
             <button style={styles.button} onClick={fetchRows}>
               Search / Refresh
@@ -321,7 +332,7 @@ const ManageAdmins = () => {
               style={{ ...styles.button, backgroundColor: "#10b981" }}
               onClick={() => setShowCreateModal(true)}
             >
-              + New Admin
+              + New Gateway
             </button>
           </div>
 
@@ -330,79 +341,63 @@ const ManageAdmins = () => {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  {[
-                    "Name",
-                    "Email",
-                    "Phone",
-                    "City",
-                    "State",
-                    "Gender",
-                    "Address",
-                    "Actions",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      style={
-                        h === "Email"
-                          ? styles.thEmail
-                          : h === "Phone"
-                          ? styles.thPhone
-                          : styles.th
-                      }
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  <th style={styles.th}>Logo</th>
+                  <th style={styles.th}>Name</th>
+                  <th style={styles.th}>Provider Key</th>
+                  <th style={styles.th}>Mode</th>
+                  <th style={styles.th}>Currency</th>
+                  <th style={styles.th}>Active</th>
+                  <th style={styles.th}>Default</th>
+                  <th style={styles.th}>Sort</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
               </thead>
-
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} style={styles.noData}>
+                    <td colSpan={9} style={styles.noData}>
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={styles.noData}>
-                      No admins found.
+                    <td colSpan={9} style={styles.noData}>
+                      No payment gateways found.
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r, index) => (
+                  rows.map((g, index) => (
                     <tr
-                      key={r._id || index}
+                      key={g._id || index}
                       style={
                         index % 2 === 0 ? styles.evenRow : styles.oddRow
                       }
                     >
-                      <td style={{ ...styles.td, whiteSpace: "nowrap" }}>
-                        <b>
-                          {r.fname} {r.lname}
-                        </b>
+                      <td style={styles.td}>
+                        {g.logoUrl ? (
+                          <img
+                            src={g.logoUrl}
+                            alt={g.name}
+                            style={{ height: 30, objectFit: "contain" }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                            No logo
+                          </span>
+                        )}
                       </td>
-                      <td style={{ ...styles.td, ...styles.tdEmail }}>
-                        {r.email}
+                      <td style={styles.td}>{g.name}</td>
+                      <td style={styles.td}>{g.providerKey}</td>
+                      <td style={styles.td}>{g.mode}</td>
+                      <td style={styles.td}>{g.currency}</td>
+                      <td style={styles.td}>
+                        {g.isActive ? "Yes" : "No"}
                       </td>
-                      <td style={{ ...styles.td, ...styles.tdPhone }}>
-                        {r.mobile}
+                      <td style={styles.td}>
+                        {g.isDefault ? "Yes" : "No"}
                       </td>
-                      <td style={styles.td}>{r.city}</td>
-                      <td style={styles.td}>{r.state}</td>
-                      <td style={styles.td}>{r.gender || "-"}</td>
-                      <td
-                        style={{
-                          ...styles.td,
-                          maxWidth: 320,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {r.address || "-"}
-                      </td>
-                      <td style={{ ...styles.td, minWidth: 240 }}>
+                      <td style={styles.td}>{g.sortOrder ?? 0}</td>
+                      <td style={{ ...styles.td, minWidth: 200 }}>
                         <div
                           style={{
                             display: "flex",
@@ -412,29 +407,19 @@ const ManageAdmins = () => {
                         >
                           <button
                             style={styles.editButton}
-                            onClick={() => openEdit(r)}
+                            onClick={() => openEdit(g)}
                           >
                             Edit
                           </button>
                           <button
                             style={{
                               ...styles.smallBtn,
-                              backgroundColor: "#d97706",
-                            }}
-                            disabled={busyId === r._id}
-                            onClick={() => resetPassword(r._id)}
-                          >
-                            {busyId === r._id ? "…" : "Reset PW"}
-                          </button>
-                          <button
-                            style={{
-                              ...styles.smallBtn,
                               backgroundColor: "#dc3545",
                             }}
-                            disabled={busyId === r._id}
-                            onClick={() => removeAdmin(r._id)}
+                            disabled={busyId === g._id}
+                            onClick={() => removeGateway(g._id)}
                           >
-                            {busyId === r._id ? "…" : "Delete"}
+                            {busyId === g._id ? "…" : "Delete"}
                           </button>
                         </div>
                       </td>
@@ -458,35 +443,15 @@ const ManageAdmins = () => {
           }
         >
           <div style={styles.modalContent}>
-            <h2>Edit Admin</h2>
+            <h2>Edit Payment Gateway</h2>
             <div style={styles.modalForm}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                }}
-              >
-                <Field label="First Name">
-                  <Input
-                    value={editRow.fname || ""}
-                    onChange={(e) =>
-                      setEditRow({ ...editRow, fname: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Last Name">
-                  <Input
-                    value={editRow.lname || ""}
-                    onChange={(e) =>
-                      setEditRow({ ...editRow, lname: e.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <Field label="Email">
-                <Input value={editRow.email || ""} disabled />
+              <Field label="Name">
+                <Input
+                  value={editRow.name || ""}
+                  onChange={(e) =>
+                    setEditRow({ ...editRow, name: e.target.value })
+                  }
+                />
               </Field>
 
               <div
@@ -496,61 +461,131 @@ const ManageAdmins = () => {
                   gap: 10,
                 }}
               >
-                <Field label="Mobile">
-                  <Input
-                    value={editRow.mobile || ""}
-                    onChange={(e) =>
-                      setEditRow({ ...editRow, mobile: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Gender">
+                <Field label="Provider Key">
                   <Select
-                    value={editRow.gender || "Male"}
+                    value={editRow.providerKey || "stripe"}
                     onChange={(e) =>
-                      setEditRow({ ...editRow, gender: e.target.value })
+                      setEditRow({
+                        ...editRow,
+                        providerKey: e.target.value,
+                      })
                     }
                   >
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
+                    <option value="stripe">stripe</option>
+                    <option value="razorpay">razorpay</option>
+                    <option value="paytm">paytm</option>
+                    <option value="other">other</option>
+                  </Select>
+                </Field>
+
+                <Field label="Mode">
+                  <Select
+                    value={editRow.mode || "test"}
+                    onChange={(e) =>
+                      setEditRow({ ...editRow, mode: e.target.value })
+                    }
+                  >
+                    <option value="test">test</option>
+                    <option value="live">live</option>
                   </Select>
                 </Field>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                }}
-              >
-                <Field label="City">
-                  <Input
-                    value={editRow.city || ""}
-                    onChange={(e) =>
-                      setEditRow({ ...editRow, city: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="State">
-                  <Input
-                    value={editRow.state || ""}
-                    onChange={(e) =>
-                      setEditRow({ ...editRow, state: e.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <Field label="Address">
+              <Field label="Logo URL">
                 <Input
-                  value={editRow.address || ""}
+                  value={editRow.logoUrl || ""}
                   onChange={(e) =>
-                    setEditRow({ ...editRow, address: e.target.value })
+                    setEditRow({ ...editRow, logoUrl: e.target.value })
                   }
                 />
               </Field>
+
+              <Field label="Description">
+                <Textarea
+                  value={editRow.description || ""}
+                  onChange={(e) =>
+                    setEditRow({
+                      ...editRow,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+
+              <Field label="Public Key (frontend-safe)">
+                <Input
+                  value={editRow.publicKey || ""}
+                  onChange={(e) =>
+                    setEditRow({
+                      ...editRow,
+                      publicKey: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 10,
+                }}
+              >
+                <Field label="Currency">
+                  <Input
+                    value={editRow.currency || "INR"}
+                    onChange={(e) =>
+                      setEditRow({
+                        ...editRow,
+                        currency: e.target.value.toUpperCase(),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Sort Order">
+                  <Input
+                    type="number"
+                    value={editRow.sortOrder ?? 0}
+                    onChange={(e) =>
+                      setEditRow({
+                        ...editRow,
+                        sortOrder: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Flags">
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      marginTop: 2,
+                    }}
+                  >
+                    <Checkbox
+                      label="Active"
+                      checked={!!editRow.isActive}
+                      onChange={(e) =>
+                        setEditRow({
+                          ...editRow,
+                          isActive: e.target.checked,
+                        })
+                      }
+                    />
+                    <Checkbox
+                      label="Default"
+                      checked={!!editRow.isDefault}
+                      onChange={(e) =>
+                        setEditRow({
+                          ...editRow,
+                          isDefault: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
+                </Field>
+              </div>
             </div>
 
             <div
@@ -588,46 +623,15 @@ const ManageAdmins = () => {
           }
         >
           <div style={styles.modalContent}>
-            <h2>New Admin</h2>
+            <h2>New Payment Gateway</h2>
             <div style={styles.modalForm}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                }}
-              >
-                <Field label="First Name">
-                  <Input
-                    value={createData.fname}
-                    onChange={(e) =>
-                      setCreateData({
-                        ...createData,
-                        fname: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Last Name">
-                  <Input
-                    value={createData.lname}
-                    onChange={(e) =>
-                      setCreateData({
-                        ...createData,
-                        lname: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <Field label="Email">
+              <Field label="Name">
                 <Input
-                  value={createData.email}
+                  value={createData.name}
                   onChange={(e) =>
                     setCreateData({
                       ...createData,
-                      email: e.target.value,
+                      name: e.target.value,
                     })
                   }
                 />
@@ -640,88 +644,137 @@ const ManageAdmins = () => {
                   gap: 10,
                 }}
               >
-                <Field label="Mobile">
-                  <Input
-                    value={createData.mobile}
-                    onChange={(e) =>
-                      setCreateData({
-                        ...createData,
-                        mobile: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Gender">
+                <Field label="Provider Key">
                   <Select
-                    value={createData.gender}
+                    value={createData.providerKey}
                     onChange={(e) =>
                       setCreateData({
                         ...createData,
-                        gender: e.target.value,
+                        providerKey: e.target.value,
                       })
                     }
                   >
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
+                    <option value="stripe">stripe</option>
+                    <option value="razorpay">razorpay</option>
+                    <option value="paytm">paytm</option>
+                    <option value="other">other</option>
+                  </Select>
+                </Field>
+
+                <Field label="Mode">
+                  <Select
+                    value={createData.mode}
+                    onChange={(e) =>
+                      setCreateData({
+                        ...createData,
+                        mode: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="test">test</option>
+                    <option value="live">live</option>
                   </Select>
                 </Field>
               </div>
 
+              <Field label="Logo URL">
+                <Input
+                  value={createData.logoUrl}
+                  onChange={(e) =>
+                    setCreateData({
+                      ...createData,
+                      logoUrl: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+
+              <Field label="Description">
+                <Textarea
+                  value={createData.description}
+                  onChange={(e) =>
+                    setCreateData({
+                      ...createData,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+
+              <Field label="Public Key (frontend-safe)">
+                <Input
+                  value={createData.publicKey}
+                  onChange={(e) =>
+                    setCreateData({
+                      ...createData,
+                      publicKey: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
+                  gridTemplateColumns: "1fr 1fr 1fr",
                   gap: 10,
                 }}
               >
-                <Field label="City">
+                <Field label="Currency">
                   <Input
-                    value={createData.city}
+                    value={createData.currency}
                     onChange={(e) =>
                       setCreateData({
                         ...createData,
-                        city: e.target.value,
+                        currency: e.target.value.toUpperCase(),
                       })
                     }
                   />
                 </Field>
-                <Field label="State">
+                <Field label="Sort Order">
                   <Input
-                    value={createData.state}
+                    type="number"
+                    value={createData.sortOrder}
                     onChange={(e) =>
                       setCreateData({
                         ...createData,
-                        state: e.target.value,
+                        sortOrder: e.target.value,
                       })
                     }
                   />
+                </Field>
+                <Field label="Flags">
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      marginTop: 2,
+                    }}
+                  >
+                    <Checkbox
+                      label="Active"
+                      checked={createData.isActive}
+                      onChange={(e) =>
+                        setCreateData({
+                          ...createData,
+                          isActive: e.target.checked,
+                        })
+                      }
+                    />
+                    <Checkbox
+                      label="Default"
+                      checked={createData.isDefault}
+                      onChange={(e) =>
+                        setCreateData({
+                          ...createData,
+                          isDefault: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
                 </Field>
               </div>
-
-              <Field label="Address">
-                <Input
-                  value={createData.address}
-                  onChange={(e) =>
-                    setCreateData({
-                      ...createData,
-                      address: e.target.value,
-                    })
-                  }
-                />
-              </Field>
-
-              <Field label="Password (default 123)">
-                <Input
-                  value={createData.password}
-                  onChange={(e) =>
-                    setCreateData({
-                      ...createData,
-                      password: e.target.value,
-                    })
-                  }
-                />
-              </Field>
             </div>
 
             <div
@@ -740,7 +793,7 @@ const ManageAdmins = () => {
               </button>
               <button
                 style={{ ...styles.saveBtn, backgroundColor: "#10b981" }}
-                onClick={createAdmin}
+                onClick={createGateway}
                 disabled={busyId === "create"}
               >
                 {busyId === "create" ? "Creating…" : "Create"}
@@ -755,7 +808,6 @@ const ManageAdmins = () => {
   );
 };
 
-/* ----- Styles ----- */
 const styles = {
   pageContainer: { display: "flex", flexDirection: "column", height: "100vh" },
   mainContent: { display: "flex", flex: 1 },
@@ -784,27 +836,7 @@ const styles = {
     fontSize: "14px",
     fontWeight: "bold",
   },
-  thEmail: {
-    backgroundColor: "#007bff",
-    color: "white",
-    padding: "12px",
-    textAlign: "left",
-    fontSize: "14px",
-    fontWeight: "bold",
-    width: "220px",
-  },
-  thPhone: {
-    backgroundColor: "#007bff",
-    color: "white",
-    padding: "12px",
-    textAlign: "left",
-    fontSize: "14px",
-    fontWeight: "bold",
-    width: "150px",
-  },
   td: { padding: "12px", borderBottom: "1px solid #ddd", textAlign: "left" },
-  tdEmail: { width: "1px" },
-  tdPhone: { width: "0px" },
   evenRow: { backgroundColor: "#f4f4f4" },
   oddRow: { backgroundColor: "#ffffff" },
 
@@ -879,4 +911,4 @@ const styles = {
   },
 };
 
-export default ManageAdmins;
+export default ManagePaymentGateways;

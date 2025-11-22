@@ -174,9 +174,9 @@ const AdminHeader = () => {
         }
 
         /* Brand */
-        .ah-brand{ display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
-        .ah-logo{ height:42px; width:auto; display:block; border-radius:10px; background:#fff; padding:3px; }
-        .ah-title{ font-weight:900; letter-spacing:.3px; margin:0; line-height:1 }
+        .ah-brand{ display:flex; align-items:center; gap:10px; ; color:inherit; }
+        .ah-logo{ height:42px; width:auto; display:block; border-radius:10px; padding:3px; }
+        .ah-title{ font-weight:900; letter-spacing:.3px; margin:0; line-height:1;text-decoration:none }
 
         /* Controls */
         .ah-actions{ display:flex; align-items:center; gap:10px; margin-left:auto; }
@@ -277,7 +277,10 @@ const AdminHeader = () => {
 
           <Link to="/admin" className="ah-brand" aria-label="Admin home">
             <img src={logo} alt="Admin" className="ah-logo" />
-            <h1 className="ah-title">Box Cricket Admin</h1>
+          <h1 className="ah-title" style={{ textDecoration: "none" }}>
+  Box Cricket
+</h1>
+
           </Link>
 
           {/* Optional search (kept off on mobile; wire when needed) */}

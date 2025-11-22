@@ -29,6 +29,7 @@ const AdminSetting = lazy(() => import("./component/AdminSetting"));
 const SuperFranchiseList = lazy(() => import("./component/SuperFranchiseList"));
 const ManageAdmin  = lazy(() => import("./component/ManageAdmins"));
 const PaymentSuccess  = lazy(() => import("./component/PaymentSuccess"));
+const PaymentGateway = lazy(() => import("./component/ManagePaymentGateways"));
 
 function Layout({ children }) {
   const location = useLocation();
@@ -37,7 +38,7 @@ function Layout({ children }) {
   const hideHeaderFooterPaths = [
     "/login", "/signin", "/admin", "/manageareas", "/manageslots", "/manageusers","/admin/settings",
     "/manageadmincontactusdata", "/adminviewfeedback", "/adminbookingdata", "/booking-form","superadmin/franchise",
-    "/manageadmins"
+    "/manageadmins","/managepaymentgateway"
   ];
 
   const hideHeaderFooter = hideHeaderFooterPaths.includes(path);
@@ -71,6 +72,7 @@ function App() {
                 </AuthRoute>
               }
             />
+             <Route path="/managepaymentgateway" element={ <AuthRoute>< PaymentGateway /></AuthRoute>} />
             <Route path="/payment-success" element={ <AuthRoute><PaymentSuccess /></AuthRoute>} />
             <Route path="/admin" element={<AuthRoute><AdminPanel /></AuthRoute>} />
             <Route path="/admin/settings" element={<AuthRoute><AdminSetting /> </AuthRoute>} />

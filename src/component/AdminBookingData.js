@@ -25,6 +25,10 @@ const CustomSnackbar = styled(Snackbar)({
   },
 });
 
+// Small helper to normalize strings for comparison
+const normalize = (val) =>
+  (val ?? "").toString().trim().toLowerCase();
+
 const AdminBookingData = () => {
   const [bookings, setBookings] = useState([]);
   const [slots, setSlots] = useState([]);
@@ -38,7 +42,7 @@ const AdminBookingData = () => {
   // Logged-in user
   const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser"));
   const userRole = loggedInUser?.role || "superadmin"; // default fallback
-  const adminAddress = (loggedInUser?.address || "").trim().toLowerCase();
+  const adminAddress = normalize(loggedInUser?.address || "");
 
   const API_BASE =
     process.env.REACT_APP_API_BASE_URL ||
@@ -65,27 +69,33 @@ const AdminBookingData = () => {
       let fetchedBookings = bookingRes.data?.data || [];
       const allAreas = areaRes.data?.data || [];
 
-      // ROLE-BASED FILTERING
+      // ===== ROLE-BASED FILTERING =====
       if (userRole === "admin" && adminAddress) {
-        fetchedBookings = fetchedBookings.filter((b) => {
-          // try match via area_id -> Area collection
+        // Filter bookings where area matches admin's address
+        let filteredForAdmin = fetchedBookings.filter((b) => {
+          const bookingAreaName = normalize(b.area_name);
+
+          let areaNameFromCollection = "";
           const areaFromCollection = allAreas.find(
             (a) => String(a._id) === String(b.area_id)
           );
+          if (areaFromCollection?.area_name) {
+            areaNameFromCollection = normalize(areaFromCollection.area_name);
+          }
 
-          const areaNameFromCollection =
-            areaFromCollection?.area_name || "";
+          const effectiveAreaName =
+            bookingAreaName || areaNameFromCollection;
 
-          const areaNameFromBooking = b.area_name || "";
-
-          const effectiveAreaName = (
-            areaNameFromCollection || areaNameFromBooking
-          )
-            .trim()
-            .toLowerCase();
-
-          return effectiveAreaName && effectiveAreaName === adminAddress;
+          return (
+            effectiveAreaName &&
+            effectiveAreaName === adminAddress
+          );
         });
+
+        // If nothing matched (e.g. address mismatch), show all bookings
+        if (filteredForAdmin.length > 0) {
+          fetchedBookings = filteredForAdmin;
+        }
       }
 
       setBookings(fetchedBookings);
@@ -128,7 +138,7 @@ const AdminBookingData = () => {
   const findSlotInfo = (slotId) =>
     slots.find((s) => String(s._id) === String(slotId?._id || slotId));
 
-  // ✅ FIX: get area name directly from booking.area_id / booking.area_name
+  // Get area name directly from booking + Area collection fallback
   const findAreaName = (booking) => {
     if (!booking) return "N/A";
 
@@ -136,7 +146,6 @@ const AdminBookingData = () => {
       (a) => String(a._id) === String(booking.area_id)
     );
 
-    // Priority: Area collection → booking.area_name → fallback
     return (
       areaFromCollection?.area_name ||
       booking.area_name ||
@@ -204,8 +213,12 @@ const AdminBookingData = () => {
                             ? `${user.fname || ""} ${user.lname || ""}`.trim()
                             : "N/A"}
                         </td>
-                        <td style={styles.td}>{user?.email || booking.email}</td>
-                        <td style={styles.td}>{user?.mobile || booking.mobile}</td>
+                        <td style={styles.td}>
+                          {user?.email || booking.email}
+                        </td>
+                        <td style={styles.td}>
+                          {user?.mobile || booking.mobile}
+                        </td>
                         <td style={styles.td}>{areaName}</td>
                         <td style={styles.td}>
                           {slot

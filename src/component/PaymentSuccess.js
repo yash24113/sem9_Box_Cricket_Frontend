@@ -4,8 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const API_BASE =
-  process.env.REACT_APP_API_BASE_URL ||
-  "http://localhost:5000/api/userapi";
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api/userapi";
 
 const PaymentSuccess = () => {
   const location = useLocation();
@@ -14,16 +13,20 @@ const PaymentSuccess = () => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const searchParams =
-      new URLSearchParams(location.search);
+    const searchParams = new URLSearchParams(location.search);
+
+    // Handle both Stripe and Razorpay:
+    //  - Stripe:   ?session_id=cs_test_...
+    //  - Razorpay: ?session_id=order_XXXX (we pass order_id as session_id)
+    //  - Fallbacks: ?order_id=..., ?razorpay_order_id=...
     const sessionId =
-      searchParams.get("session_id");
+      searchParams.get("session_id") ||
+      searchParams.get("order_id") ||
+      searchParams.get("razorpay_order_id");
 
     const verify = async () => {
       if (!sessionId) {
-        setError(
-          "Missing session_id from Stripe. Payment status unknown."
-        );
+        setError("Missing session/order id. Payment status unknown.");
         setStatus("");
         return;
       }
@@ -32,40 +35,33 @@ const PaymentSuccess = () => {
         const res = await axios.get(
           `${API_BASE}/checkout/session/${sessionId}`
         );
-        const data = res.data;
+        const data = res.data || {};
 
-        if (
-          data.success &&
-          (data.paid ||
-            data.payment_status ===
-              "paid" ||
-            data.data?.payment_status ===
-              "paid")
-        ) {
+        const paidFlag =
+          data.paid ||
+          data.payment_status === "paid" ||
+          data.data?.payment_status === "paid";
+
+        if (data.success && paidFlag) {
           setStatus(
             "Payment verified successfully. Redirecting to feedback..."
           );
 
           // clear any pending booking context
-          localStorage.removeItem(
-            "pendingBookingContext"
-          );
+          localStorage.removeItem("pendingBookingContext");
 
-          // redirect to feedback page
-          navigate("/feedback", {
-            replace: true,
-          });
+          // short delay so user can read status
+          setTimeout(() => {
+            navigate("/feedback", {
+              replace: true,
+            });
+          }, 1200);
         } else {
-          setError(
-            "Payment not completed or could not be verified."
-          );
+          setError("Payment not completed or could not be verified.");
           setStatus("");
         }
       } catch (err) {
-        console.error(
-          "Verify session error:",
-          err
-        );
+        console.error("Verify session error:", err);
         setError(
           "Failed to verify payment. Please contact support with your payment details."
         );
@@ -84,11 +80,9 @@ const PaymentSuccess = () => {
         padding: 24,
         borderRadius: 16,
         background: "#f9fafb",
-        border:
-          "1px solid rgba(148,163,253,.35)",
+        border: "1px solid rgba(148,163,253,.35)",
         textAlign: "center",
-        boxShadow:
-          "0 10px 30px rgba(15,23,42,.12)",
+        boxShadow: "0 10px 30px rgba(15,23,42,.12)",
       }}
     >
       <h2

@@ -10,7 +10,7 @@ import {
   FaCalendarAlt,
   FaCog,
   FaBars,
-  FaChartLine,
+  FaMoneyBillWave,
   FaUserShield,
   FaSignOutAlt,
 } from "react-icons/fa";
@@ -105,7 +105,7 @@ const AdminSidebar = () => {
     { to: "/AdminViewFeedback", label: "Feedback", icon: <FaComments /> },
     { to: "/manageadmins", label: "Admin Details", icon: <FaUserShield /> },
     { to: "/manageusers", label: "Users", icon: <FaUsers /> },
-    { to: "/admin/reports", label: "Reports", icon: <FaChartLine /> },
+     { to: "/managepaymentgateway", label: "Payment Gateway", icon: <FaMoneyBillWave /> },
     { to: "/admin/settings", label: "Settings", icon: <FaCog /> },
     { to: "/logout", label: "Logout", icon: <FaSignOutAlt />, isLogout: true },
   ];
@@ -117,6 +117,7 @@ const AdminSidebar = () => {
     { to: "/AdminViewFeedback", label: "Feedback", icon: <FaComments /> },
     { to: "/manageadmins/me", label: "Admin Details", icon: <FaUserShield /> },
     { to: "/manageusers?scope=mine", label: "Users", icon: <FaUsers /> },
+    
     { to: "/admin/settings", label: "Settings", icon: <FaCog /> },
     { to: "/logout", label: "Logout", icon: <FaSignOutAlt />, isLogout: true },
   ];
