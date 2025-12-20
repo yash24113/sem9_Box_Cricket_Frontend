@@ -51,7 +51,7 @@ const CustomSnackbar = styled(Snackbar)({
 
 // Base API
 const API_BASE =
-  process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api/userapi";
+  process.env.REACT_APP_API_BASE_URL || "https://sem9-box-cricket-backend.onrender.com/api/userapi";
 
 // Axios instance
 const api = axios.create({ baseURL: API_BASE });

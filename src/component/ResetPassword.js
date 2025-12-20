@@ -5,7 +5,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const API_BASE = (
-    process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api/userapi"
+    process.env.REACT_APP_API_BASE_URL || "https://sem9-box-cricket-backend.onrender.com/api/userapi"
 ).replace(/\/+$/, "");
 
 /* ================= SVG ICONS ================= */

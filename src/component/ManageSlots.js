@@ -115,7 +115,7 @@ const styles = {
 
 const API_ROOT = (
   process.env.REACT_APP_API_BASE_URL ||
-  "http://localhost:5000/api/userapi"
+  "https://sem9-box-cricket-backend.onrender.com/api/userapi"
 ).replace(/\/+$/, "");
 
 /* ---------- helpers ---------- */

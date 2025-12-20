@@ -7,7 +7,7 @@ import logo from "../assets/logo.png";
 import About from "./About";
 
 const API_ROOT =
-  process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
+  process.env.REACT_APP_API_ROOT || "https://sem9-box-cricket-backend.onrender.com/api/userapi";
 
 /* ------------------- content ------------------- */
 const heroSlides = [

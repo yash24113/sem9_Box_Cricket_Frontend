@@ -9,7 +9,7 @@ import AdminSidebar from "./AdminSidebar";
 
 const RAW_API =
   process.env.REACT_APP_API_ROOT ||
-  "http://localhost:5000/api/userapi";
+  "https://sem9-box-cricket-backend.onrender.com/api/userapi";
 const API = RAW_API.replace(/\/+$/, "");
 
 /* ---------- tiny helpers ---------- */

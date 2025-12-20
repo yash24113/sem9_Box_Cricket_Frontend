@@ -13,7 +13,7 @@ import {
 } from "react-icons/fa";
 
 const RAW_API_ROOT =
-  process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
+  process.env.REACT_APP_API_ROOT || "https://sem9-box-cricket-backend.onrender.com/api/userapi";
 const API_ROOT = RAW_API_ROOT.replace(/\/+$/, "");
 
 async function getScopedSummary(city) {

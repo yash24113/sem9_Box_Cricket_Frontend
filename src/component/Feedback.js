@@ -59,7 +59,7 @@ const Feedback = () => {
         if (!validate()) return;
 
         try {
-            const response = await fetch("http://localhost:5000/api/userapi/addFeedback", {
+            const response = await fetch("https://sem9-box-cricket-backend.onrender.com/api/userapi/addFeedback", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

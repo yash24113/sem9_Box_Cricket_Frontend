@@ -12,8 +12,8 @@ const ManageUsers = () => {
   const [imageFile, setImageFile] = useState(null);
 
   const recordsPerPage = 2;
-  const API_URL = `http://localhost:5000/api/registeruserapi/getRegisterUser`;
-  const UPDATE_URL = `http://localhost:5000/api/registeruserapi/updateRegisterUser`;
+  const API_URL = `https://sem9-box-cricket-backend.onrender.com/api/registeruserapi/getRegisterUser`;
+  const UPDATE_URL = `https://sem9-box-cricket-backend.onrender.com/api/registeruserapi/updateRegisterUser`;
 
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
 
