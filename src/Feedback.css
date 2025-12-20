@@ -1,5 +1,7 @@
-.feedback-container, .admin-feedback-container {
-    width: 50%;
+.feedback-container,
+.admin-feedback-container {
+    width: 90%;
+    max-width: 600px;
     margin: auto;
     background: #fff;
     padding: 20px;
@@ -7,25 +9,28 @@
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
     text-align: center;
 
-    
+
 }
 
 .heading {
-     position: fixed;
+    position: fixed;
     background-color: #fff;
     margin: 0 1px;
-    width: 382px;
+    width: 100%;
+    max-width: 382px;
     padding: 15px 0;
     font-size: 22px;
     color: #333;
     text-align: center;
     font-weight: bold;
-    z-index: 10; /* Ensures it stays above other elements */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Adds a subtle shadow */
+    z-index: 10;
+    /* Ensures it stays above other elements */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    /* Adds a subtle shadow */
 }
-.header1
-{
-padding-top: 16%;
+
+.header1 {
+    padding-top: 16%;
 }
 
 .form {
@@ -34,7 +39,9 @@ padding-top: 16%;
     gap: 10px;
 }
 
-.input, .textarea, .select {
+.input,
+.textarea,
+.select {
     width: 100%;
     padding: 10px;
     border: 1px solid #ccc;
@@ -85,7 +92,8 @@ padding-top: 16%;
 }
 
 
-.feedback-table th, .feedback-table td {
+.feedback-table th,
+.feedback-table td {
     border: 1px solid #ddd;
     padding: 10px;
     text-align: center;
@@ -119,7 +127,8 @@ padding-top: 16%;
     flex-direction: column;
 }
 
-.input, .textarea {
+.input,
+.textarea {
     width: 100%;
     padding: 10px;
     margin: 5px 0;

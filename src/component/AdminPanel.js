@@ -1,9 +1,7 @@
 // AdminPanel.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import AdminSidebar from "./AdminSidebar";
-import AdminHeader from "./AdminHeader";
-import AdminFooter from "./AdminFooter";
+import AdminLayout from "./AdminLayout";
 import axios from "axios";
 import {
   FaMapMarkerAlt,
@@ -166,66 +164,66 @@ const AdminPanel = () => {
   }, [user, role, navigate]);
 
   // Load summary (with special handling for admin areaWiseSlots)
-// Load summary with booking filtered same as AdminBookingData
-useEffect(() => {
-  let cancelled = false;
+  // Load summary with booking filtered same as AdminBookingData
+  useEffect(() => {
+    let cancelled = false;
 
-  (async () => {
-    if (!user) return;
-    setLoading(true);
+    (async () => {
+      if (!user) return;
+      setLoading(true);
 
-    try {
-      // Step 1: Base summary (superadmin = all, admin = city-scoped)
-      let baseSummary =
-        role === "admin"
-          ? await getScopedSummary(scopeCity)
-          : await getScopedSummary("");
+      try {
+        // Step 1: Base summary (superadmin = all, admin = city-scoped)
+        let baseSummary =
+          role === "admin"
+            ? await getScopedSummary(scopeCity)
+            : await getScopedSummary("");
 
-      // Step 2: Fetch bookings + areas to apply ADMIN area filter
-      const [bookingRes, areaRes] = await Promise.all([
-        axios.get(`${API_ROOT}/viewBooking`),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL}/viewArea`)
-      ]);
+        // Step 2: Fetch bookings + areas to apply ADMIN area filter
+        const [bookingRes, areaRes] = await Promise.all([
+          axios.get(`${API_ROOT}/viewBooking`),
+          axios.get(`${process.env.REACT_APP_API_BASE_URL}/viewArea`)
+        ]);
 
-      const allBookings = bookingRes?.data?.data || [];
-      const allAreas = areaRes?.data?.data || [];
+        const allBookings = bookingRes?.data?.data || [];
+        const allAreas = areaRes?.data?.data || [];
 
-      let bookingCount = allBookings.length;
+        let bookingCount = allBookings.length;
 
-      if (role === "admin" && adminAddress) {
-        bookingCount = allBookings.filter((b) => {
-          const bookingArea = allAreas.find(
-            (a) => String(a._id) === String(b.area_id)
-          );
-          return (
-            bookingArea &&
-            String(bookingArea.area_name).trim().toLowerCase() ===
+        if (role === "admin" && adminAddress) {
+          bookingCount = allBookings.filter((b) => {
+            const bookingArea = allAreas.find(
+              (a) => String(a._id) === String(b.area_id)
+            );
+            return (
+              bookingArea &&
+              String(bookingArea.area_name).trim().toLowerCase() ===
               String(adminAddress).trim().toLowerCase()
-          );
-        }).length;
+            );
+          }).length;
+        }
+
+        // Step 3: Override booking count inside summary
+        baseSummary = {
+          ...baseSummary,
+          booking: bookingCount,
+        };
+
+        if (!cancelled) {
+          setSummary(baseSummary || {});
+        }
+      } catch (err) {
+        console.warn("admin panel summary load error:", err);
+        if (!cancelled) setSummary({});
+      } finally {
+        if (!cancelled) setLoading(false);
       }
+    })();
 
-      // Step 3: Override booking count inside summary
-      baseSummary = {
-        ...baseSummary,
-        booking: bookingCount,
-      };
-
-      if (!cancelled) {
-        setSummary(baseSummary || {});
-      }
-    } catch (err) {
-      console.warn("admin panel summary load error:", err);
-      if (!cancelled) setSummary({});
-    } finally {
-      if (!cancelled) setLoading(false);
-    }
-  })();
-
-  return () => {
-    cancelled = true;
-  };
-}, [user, role, scopeCity, adminAddress]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, role, scopeCity, adminAddress]);
 
 
   const at = (ts) => new Date(ts).toLocaleString();
@@ -235,163 +233,151 @@ useEffect(() => {
     localStorage.getItem("adminTextColor") || "#ffffff";
 
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        flexDirection: "column",
-        background: "#f4f6f9",
-      }}
-    >
-      <AdminHeader />
-      <div style={{ display: "flex", flex: 1 }}>
-        <AdminSidebar />
+    <AdminLayout>
+      <div
+        style={{
+          flex: 1,
+          padding: 20,
+          overflowY: "auto",
+          background: "#eef2f7",
+        }}
+      >
+        {/* Top header */}
         <div
           style={{
-            flex: 1,
-            padding: 20,
-            overflowY: "auto",
-            background: "#eef2f7",
+            background: `linear-gradient(120deg, ${cardBgColor} 0%, #243b55 100%)`,
+            color: textColor,
+            borderRadius: 16,
+            padding: 16,
+            border: "1px solid rgba(255,255,255,.08)",
+            boxShadow: "0 10px 28px rgba(0,0,0,.18)",
+            marginBottom: 16,
           }}
         >
-          {/* Top header */}
-          <div
-            style={{
-              background: `linear-gradient(120deg, ${cardBgColor} 0%, #243b55 100%)`,
-              color: textColor,
-              borderRadius: 16,
-              padding: 16,
-              border: "1px solid rgba(255,255,255,.08)",
-              boxShadow: "0 10px 28px rgba(0,0,0,.18)",
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <h2
-                  style={{
-                    margin: "0 0 4px",
-                    fontWeight: 900,
-                  }}
-                >
-                  {role === "superadmin"
-                    ? "Superadmin"
-                    : "Admin"}{" "}
-                  Dashboard
-                </h2>
-                <div
-                  style={{ opacity: 0.9, fontSize: 13 }}
-                >
-                  Last updated: {at(Date.now())}
-                  {role === "admin" && scopeCity
-                    ? ` • Scope: ${scopeCity}`
-                    : ""}
-                  {role === "admin" && adminAddress
-                    ? ` • Area: ${adminAddress}`
-                    : ""}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cards */}
           <div
             style={{
               display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
               flexWrap: "wrap",
-              gap: 16,
-              marginBottom: 16,
             }}
           >
-            {role === "superadmin" && (
-              <Card
-                icon={<FaMapMarkerAlt />}
-                label="Areas"
-                value={summary.areas}
-                loading={loading}
-                onClick={() => navigate("/manageareas")}
-              />
-            )}
-
-            <Card
-              icon={<FaClock />}
-              label={
-                role === "admin"
-                  ? "AreaWise Slots (Your Area)"
-                  : "AreaWise Slots"
-              }
-              value={summary.areaWiseSlots}
-              loading={loading}
-              onClick={() =>
-                navigate(
-                  role === "admin"
-                    ? "/manageslots?scope=mine"
-                    : "/manageslots"
-                )
-              }
-            />
-
-            <Card
-              icon={<FaComments />}
-              label="Feedback"
-              value={summary.feedback}
-              loading={loading}
-              onClick={() => navigate("/AdminViewFeedback")}
-            />
-
-            <Card
-              icon={<FaEnvelope />}
-              label="Franchise Leads"
-              value={summary.contactus}
-              loading={loading}
-              onClick={() => navigate("/super/franchise")}
-            />
-
-            <Card
-              icon={<FaCalendarAlt />}
-              label="Booking"
-              value={summary.booking}
-              loading={loading}
-              onClick={() =>
-                navigate(
-                  role === "admin"
-                    ? "/AdminBookingData?scope=mine"
-                    : "/AdminBookingData"
-                )
-              }
-            />
-
-            <Card
-              icon={<FaUserAlt />}
-              label="Users"
-              value={summary.users}
-              loading={loading}
-              onClick={() =>
-                navigate(
-                  role === "admin"
-                    ? "/manageusers?scope=mine"
-                    : "/manageusers"
-                )
-              }
-            />
-          </div>
-
-          {/* Nested admin routes */}
-          <div style={{ marginTop: 16 }}>
-            <Outlet />
+            <div>
+              <h2
+                style={{
+                  margin: "0 0 4px",
+                  fontWeight: 900,
+                }}
+              >
+                {role === "superadmin"
+                  ? "Superadmin"
+                  : "Admin"}{" "}
+                Dashboard
+              </h2>
+              <div
+                style={{ opacity: 0.9, fontSize: 13 }}
+              >
+                Last updated: {at(Date.now())}
+                {role === "admin" && scopeCity
+                  ? ` • Scope: ${scopeCity}`
+                  : ""}
+                {role === "admin" && adminAddress
+                  ? ` • Area: ${adminAddress}`
+                  : ""}
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Cards */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+            marginBottom: 16,
+          }}
+        >
+          {role === "superadmin" && (
+            <Card
+              icon={<FaMapMarkerAlt />}
+              label="Areas"
+              value={summary.areas}
+              loading={loading}
+              onClick={() => navigate("/manageareas")}
+            />
+          )}
+
+          <Card
+            icon={<FaClock />}
+            label={
+              role === "admin"
+                ? "AreaWise Slots (Your Area)"
+                : "AreaWise Slots"
+            }
+            value={summary.areaWiseSlots}
+            loading={loading}
+            onClick={() =>
+              navigate(
+                role === "admin"
+                  ? "/manageslots?scope=mine"
+                  : "/manageslots"
+              )
+            }
+          />
+
+          <Card
+            icon={<FaComments />}
+            label="Feedback"
+            value={summary.feedback}
+            loading={loading}
+            onClick={() => navigate("/AdminViewFeedback")}
+          />
+
+          <Card
+            icon={<FaEnvelope />}
+            label="Franchise Leads"
+            value={summary.contactus}
+            loading={loading}
+            onClick={() => navigate("/super/franchise")}
+          />
+
+          <Card
+            icon={<FaCalendarAlt />}
+            label="Booking"
+            value={summary.booking}
+            loading={loading}
+            onClick={() =>
+              navigate(
+                role === "admin"
+                  ? "/AdminBookingData?scope=mine"
+                  : "/AdminBookingData"
+              )
+            }
+          />
+
+          <Card
+            icon={<FaUserAlt />}
+            label="Users"
+            value={summary.users}
+            loading={loading}
+            onClick={() =>
+              navigate(
+                role === "admin"
+                  ? "/manageusers?scope=mine"
+                  : "/manageusers"
+              )
+            }
+          />
+        </div>
+
+        {/* Nested admin routes */}
+        <div style={{ marginTop: 16 }}>
+          <Outlet />
+        </div>
       </div>
-      <AdminFooter />
-    </div>
+    </AdminLayout>
   );
 };
 

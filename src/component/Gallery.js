@@ -143,7 +143,7 @@ const Gallery = () => {
             {/* Grid size */}
             <div className="g-size">
               <span className="g-size-label">View:</span>
-              {["s","m","l"].map((s) => (
+              {["s", "m", "l"].map((s) => (
                 <button
                   key={s}
                   className={`chip ${gridSize === s ? "is-active" : ""}`}
@@ -224,8 +224,8 @@ const Gallery = () => {
       {modalIdx >= 0 && (
         <div className="g-modal" onClick={closeModal} role="dialog" aria-modal="true">
           <button className="g-close" onClick={closeModal} aria-label="Close">×</button>
-          <button className="g-nav g-prev" onClick={(e)=>{e.stopPropagation(); prevModal();}} aria-label="Previous">‹</button>
-          <figure className="g-modal-fig" onClick={(e)=>e.stopPropagation()}>
+          <button className="g-nav g-prev" onClick={(e) => { e.stopPropagation(); prevModal(); }} aria-label="Previous">‹</button>
+          <figure className="g-modal-fig" onClick={(e) => e.stopPropagation()}>
             <img src={toShow[modalIdx].src} alt={toShow[modalIdx].alt} className="g-modal-img" />
             <figcaption className="g-modal-cap">
               <div className="g-cap-title">{toShow[modalIdx].alt}</div>
@@ -246,7 +246,7 @@ const Gallery = () => {
               </div>
             </figcaption>
           </figure>
-          <button className="g-nav g-next" onClick={(e)=>{e.stopPropagation(); nextModal();}} aria-label="Next">›</button>
+          <button className="g-nav g-next" onClick={(e) => { e.stopPropagation(); nextModal(); }} aria-label="Next">›</button>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import "../Login.css";
 
 const imageList = [
@@ -44,6 +45,10 @@ const Login = () => {
   const [resendDisabled, setResendDisabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  // Toggles for password visibility
+  const [showPass, setShowPass] = useState(false);
+  const [showCPass, setShowCPass] = useState(false);
+
   const navigate = useNavigate();
 
   // rotating background
@@ -53,7 +58,7 @@ const Login = () => {
         const idx = imageList.indexOf(prev);
         return imageList[(idx + 1) % imageList.length];
       });
-    }, 2000);
+    }, 4000); // slower rotation
     return () => clearInterval(interval);
   }, []);
 
@@ -231,168 +236,296 @@ const Login = () => {
     setOtp(["", "", "", "", "", ""]);
   };
 
+  // --- STYLES ---
+  // Using React inline styles for layout to avoid messy CSS overwrites,
+  // while keeping existing classes for basic look & theme.
+
+
+  const singleColStyle = {
+    width: "100%",
+    marginBottom: "8px",
+  };
+
+  const inputGroupStyle = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    width: "100%",
+    position: "relative",
+  };
+
+  const labelStyle = {
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "#444",
+    marginBottom: "4px",
+    marginLeft: "2px",
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "8px 10px",
+    borderRadius: "6px",
+    border: "1px solid #ccc",
+    fontSize: "14px",
+    outline: "none",
+  };
+
+  const errorStyle = {
+    color: "red",
+    fontSize: "11px",
+    marginTop: "2px",
+    marginLeft: "2px",
+  };
+
+  const bgStyle = {
+    backgroundImage: `url(${bgImage})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    height: "100vh",
+    width: "100vw",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    transition: "background-image 1s ease-in-out",
+  };
+
+  const cardStyle = {
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: "12px",
+    padding: "20px 30px",
+    width: "90%",
+    maxWidth: "480px", // slightly wider for 2-col
+    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
+    maxHeight: "95vh",
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  };
+
   return (
-    <div
-      className="background"
-      style={{
-        backgroundImage: `url(${bgImage})`,
-        transition: "background-image 1s ease-in-out",
-      }}
-    >
-      <div className="container">
-        <h1 className="heading">Registration Form</h1>
-        <div className="header1">
-          <form
-            onSubmit={handleSubmit}
-            className="form"
-            encType="multipart/form-data"
-          >
-            <input type="hidden" value={data.user_id} />
+    <div style={bgStyle}>
+      <div style={cardStyle}>
+        <h2 style={{ marginBottom: "15px", color: "#333", fontSize: "24px" }}>
+          Registration
+        </h2>
 
-            <input
-              type="text"
-              placeholder="First Name"
-              className="input"
-              value={data.fname}
-              onChange={(e) => setData({ ...data, fname: e.target.value })}
-              autoFocus
-            />
-            {error.fname && (
-              <span className="error-message">First name is required</span>
-            )}
-
-            <input
-              type="text"
-              placeholder="Last Name"
-              className="input"
-              value={data.lname}
-              onChange={(e) => setData({ ...data, lname: e.target.value })}
-            />
-            {error.lname && (
-              <span className="error-message">Last name is required</span>
-            )}
-
-            <input
-              type="text"
-              placeholder="Email"
-              className="input"
-              value={data.email}
-              onChange={(e) => setData({ ...data, email: e.target.value })}
-            />
-            {error.email && (
-              <span className="error-message">Enter a valid email</span>
-            )}
-
-            <input
-              type="text"
-              placeholder="Mobile"
-              className="input"
-              value={data.mobile}
-              onChange={(e) => setData({ ...data, mobile: e.target.value })}
-            />
-            {error.mobile && (
-              <span className="error-message">
-                Enter a valid 10-digit mobile number
-              </span>
-            )}
-
-            <div className="gender-container">
-              <label className="label">Gender:</label>
-              <label>
-                <input
-                  type="radio"
-                  value="Male"
-                  checked={data.gender === "Male"}
-                  onChange={(e) => setData({ ...data, gender: e.target.value })}
-                />{" "}
-                Male
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  value="Female"
-                  checked={data.gender === "Female"}
-                  onChange={(e) => setData({ ...data, gender: e.target.value })}
-                />{" "}
-                Female
-              </label>
+        <form
+          onSubmit={handleSubmit}
+          style={{ width: "100%" }}
+          encType="multipart/form-data"
+        >
+          {/* Row 1: First Name & Last Name */}
+          <div className="form-row">
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>First Name</label>
+              <input
+                type="text"
+                style={{ ...inputStyle, borderColor: error.fname ? "red" : "#ccc" }}
+                value={data.fname}
+                onChange={(e) => setData({ ...data, fname: e.target.value })}
+                placeholder="Ex. John"
+              />
+              {error.fname && <span style={errorStyle}>Required</span>}
             </div>
-            {error.gender && (
-              <span className="error-message">Gender is required</span>
-            )}
 
-            <div className="city-container">
-              <label className="label">City:</label>
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Last Name</label>
+              <input
+                type="text"
+                style={{ ...inputStyle, borderColor: error.lname ? "red" : "#ccc" }}
+                value={data.lname}
+                onChange={(e) => setData({ ...data, lname: e.target.value })}
+                placeholder="Ex. Doe"
+              />
+              {error.lname && <span style={errorStyle}>Required</span>}
+            </div>
+          </div>
+
+          {/* Row 2: Email & Mobile */}
+          <div className="form-row">
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Email Address</label>
+              <input
+                type="email"
+                style={{ ...inputStyle, borderColor: error.email ? "red" : "#ccc" }}
+                value={data.email}
+                onChange={(e) => setData({ ...data, email: e.target.value })}
+                placeholder="john@example.com"
+              />
+              {error.email && <span style={errorStyle}>Invalid Email</span>}
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Mobile Number</label>
+              <input
+                type="text"
+                maxLength={10}
+                style={{ ...inputStyle, borderColor: error.mobile ? "red" : "#ccc" }}
+                value={data.mobile}
+                onChange={(e) => setData({ ...data, mobile: e.target.value })}
+                placeholder="9876543210"
+              />
+              {error.mobile && <span style={errorStyle}>Invalid Mobile</span>}
+            </div>
+          </div>
+
+          {/* Row 3: Gender & City */}
+          <div className="form-row">
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Gender</label>
+              <div style={{ display: "flex", gap: "10px", marginTop: "5px" }}>
+                <label style={{ fontSize: "13px", cursor: "pointer" }}>
+                  <input
+                    type="radio"
+                    value="Male"
+                    checked={data.gender === "Male"}
+                    onChange={(e) => setData({ ...data, gender: e.target.value })}
+                  />{" "}
+                  Male
+                </label>
+                <label style={{ fontSize: "13px", cursor: "pointer" }}>
+                  <input
+                    type="radio"
+                    value="Female"
+                    checked={data.gender === "Female"}
+                    onChange={(e) => setData({ ...data, gender: e.target.value })}
+                  />{" "}
+                  Female
+                </label>
+              </div>
+              {error.gender && <span style={errorStyle}>Required</span>}
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>City</label>
               <select
-                className="select"
+                style={{ ...inputStyle, cursor: "pointer", borderColor: error.city ? "red" : "#ccc" }}
                 value={data.city}
                 onChange={(e) => setData({ ...data, city: e.target.value })}
               >
-                <option value="">--- Select City ---</option>
+                <option value="">Select City</option>
                 <option value="Ahmedabad">Ahmedabad</option>
                 <option value="Surat">Surat</option>
                 <option value="Rajkot">Rajkot</option>
               </select>
+              {error.city && <span style={errorStyle}>Required</span>}
             </div>
-            {error.city && (
-              <span className="error-message">City is required</span>
-            )}
+          </div>
 
-            <input
-              type="password"
-              placeholder="Password"
-              className="input"
-              value={data.password}
-              onChange={(e) => setData({ ...data, password: e.target.value })}
-            />
-            {error.password && (
-              <span className="error-message">Password is required</span>
-            )}
+          {/* Row 4: Passwords */}
+          <div className="form-row">
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Password</label>
+              <div style={{ position: "relative", width: "100%" }}>
+                <input
+                  type={showPass ? "text" : "password"}
+                  style={{ ...inputStyle, borderColor: error.password ? "red" : "#ccc" }}
+                  value={data.password}
+                  onChange={(e) => setData({ ...data, password: e.target.value })}
+                  placeholder="******"
+                />
+                <span
+                  onClick={() => setShowPass(!showPass)}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "8px",
+                    cursor: "pointer",
+                    color: "#666",
+                  }}
+                >
+                  {showPass ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+              {error.password && <span style={errorStyle}>Required</span>}
+            </div>
 
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              className="input"
-              value={data.cpassword}
-              onChange={(e) => setData({ ...data, cpassword: e.target.value })}
-            />
-            {error.cpassword && (
-              <span className="error-message">Passwords must match</span>
-            )}
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Confirm Password</label>
+              <div style={{ position: "relative", width: "100%" }}>
+                <input
+                  type={showCPass ? "text" : "password"}
+                  style={{ ...inputStyle, borderColor: error.cpassword ? "red" : "#ccc" }}
+                  value={data.cpassword}
+                  onChange={(e) => setData({ ...data, cpassword: e.target.value })}
+                  placeholder="******"
+                />
+                <span
+                  onClick={() => setShowCPass(!showCPass)}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "8px",
+                    cursor: "pointer",
+                    color: "#666",
+                  }}
+                >
+                  {showCPass ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+              {error.cpassword && <span style={errorStyle}>Must match</span>}
+            </div>
+          </div>
 
-            <div className="file-upload">
-              <label className="label">Upload Profile Image:</label>
+          {/* Row 5: Profile Image */}
+          <div style={singleColStyle}>
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Profile Image</label>
               <input
                 type="file"
                 accept="image/*"
                 onChange={(e) => setImageFile(e.target.files[0])}
+                style={{ fontSize: "13px" }}
               />
-              {error.profile_image && (
-                <span className="error-message">Profile image is required</span>
-              )}
+              {error.profile_image && <span style={errorStyle}>Required</span>}
             </div>
+          </div>
 
+          {/* Buttons */}
+          <div style={{ display: "flex", gap: "10px", marginTop: "5px" }}>
             <button
               type="submit"
-              className="btn btn-success full-width-button"
               disabled={loading}
+              style={{
+                flex: 1,
+                backgroundColor: loading ? "#6c757d" : "#28a745",
+                color: "white",
+                padding: "10px",
+                border: "none",
+                borderRadius: "5px",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: "bold",
+              }}
             >
-              {loading ? "Submitting..." : "Submit"}
+              {loading ? "Submitting..." : "Register"}
             </button>
-
             <button
               type="button"
               onClick={resetForm}
-              className="btn btn-danger full-width-button"
+              style={{
+                flex: 1,
+                backgroundColor: "#dc3545",
+                color: "white",
+                padding: "10px",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
             >
               Reset
             </button>
+          </div>
 
-            <p className="login-link">
-              If you have an account, <Link to="/Signin">Login here</Link>
-            </p>
-          </form>
-        </div>
+          <p style={{ marginTop: "15px", fontSize: "14px", textAlign: "center" }}>
+            Already have an account?{" "}
+            <Link to="/Signin" style={{ color: "#007bff", textDecoration: "none", fontWeight: "600" }}>
+              Login here
+            </Link>
+          </p>
+        </form>
       </div>
 
       {showOtpModal && (

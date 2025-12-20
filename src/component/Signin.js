@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -27,6 +28,15 @@ const Signin = () => {
   const [mathLoading, setMathLoading] = useState(false);
   const [bgIndex, setBgIndex] = useState(0);
   const [showMathModal, setShowMathModal] = useState(false);
+
+
+  // Forgot password state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  // Password Visibility State
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
 
@@ -153,6 +163,39 @@ const Signin = () => {
     }
 
     proceedLogin();
+
+  };
+
+  // Forgot Password Submit
+  const handleForgotSubmit = async () => {
+    if (!forgotEmail) {
+      toast.error("Please enter your email!");
+      return;
+    }
+    setForgotLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        toast.error(data.error || data.message || "Failed to send reset link.");
+      } else {
+        toast.success("Reset link sent! Check your email.");
+        setShowForgotModal(false);
+        setForgotEmail("");
+      }
+    } catch (err) {
+      console.error("Forgot password error:", err);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   return (
@@ -185,15 +228,43 @@ const Signin = () => {
             }
             autoFocus
           />
-          <input
-            type="password"
-            placeholder="Password"
-            style={inputStyle}
-            value={loginData.password}
-            onChange={(e) =>
-              setLoginData({ ...loginData, password: e.target.value })
-            }
-          />
+          <div style={{ position: "relative", width: "100%", margin: "10px 0" }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              style={{ ...inputStyle, margin: 0 }} // Remove wrapper margin from input
+              value={loginData.password}
+              onChange={(e) =>
+                setLoginData({ ...loginData, password: e.target.value })
+              }
+            />
+            <span
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                cursor: "pointer",
+                color: "#777",
+              }}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </span>
+          </div>
+          <div style={{ textAlign: "center", marginTop: "-5px", marginBottom: "5px" }}>
+            <span
+              onClick={() => setShowForgotModal(true)}
+              style={{
+                color: "#007bff",
+                cursor: "pointer",
+                fontSize: "14px",
+                textDecoration: "underline",
+              }}
+            >
+              Forgot Password?
+            </span>
+          </div>
           <button
             type="submit"
             disabled={loading}
@@ -256,6 +327,40 @@ const Signin = () => {
               </button>
               <button
                 onClick={() => setShowMathModal(false)}
+                style={buttonStyle("#dc3545")}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showForgotModal && (
+        <div style={modalBackdrop}>
+          <div style={modalContent}>
+            <h3>Forgot Password</h3>
+            <p style={{ fontSize: "14px", color: "#555" }}>
+              Enter your email to receive a reset link.
+            </p>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              style={inputStyle}
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                onClick={handleForgotSubmit}
+                disabled={forgotLoading}
+                style={buttonStyle("#007bff")}
+              >
+                {forgotLoading ? "Sending..." : "Send Link"}
+              </button>
+              <button
+                onClick={() => setShowForgotModal(false)}
                 style={buttonStyle("#dc3545")}
               >
                 Cancel
