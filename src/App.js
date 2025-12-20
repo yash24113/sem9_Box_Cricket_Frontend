@@ -3,7 +3,6 @@ import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// Lazy load all components
 import Loader from "./component/Loader";
 const Header = lazy(() => import("./component/Header"));
 const Footer = lazy(() => import("./component/Footer"));
@@ -20,10 +19,12 @@ const ManageSlots = lazy(() => import("./component/ManageSlots"));
 const ManageUsers = lazy(() => import("./component/ManageUsers"));
 const AreaList = lazy(() => import("./component/AreaList"));
 const ContactUs = lazy(() => import("./component/ContactUs"));
-const ManageAdminContactusData = lazy(() => import("./component/ManageAdminContactusData"));
+const ManageAdminContactusData = lazy(() =>
+  import("./component/ManageAdminContactusData")
+);
 const Profile = lazy(() => import("./component/Profile"));
 const Feedback = lazy(() => import("./component/Feedback"));
-const AdminViewFeedback = lazy(() => import('./component/AdminViewFeedback'));
+const AdminViewFeedback = lazy(() => import("./component/AdminViewFeedback"));
 const AreaWiseSlot = lazy(() => import("./component/AreaWiseSlot"));
 const BookingForm = lazy(() => import("./component/BookingForm"));
 const UserBooking = lazy(() => import("./component/UserBooking"));
@@ -39,22 +40,23 @@ function Layout({ children }) {
   const location = useLocation();
   const path = location.pathname.toLowerCase();
 
-  const hideHeaderFooterPaths = [
-    "/login", "/signin", "/admin", "/manageareas", "/manageslots", "/manageusers", "/admin/settings",
-    "/manageadmincontactusdata", "/adminviewfeedback", "/adminbookingdata", "/booking-form", "/super/franchise",
-    "/manageadmins", "/managepaymentgateway"
-  ];
-
-  // Also hide for reset password pages (regex check or simple check if we can't do regex easily)
-  if (path.startsWith("/reset-password/")) {
-    hideHeaderFooterPaths.push(path); // This won't work perfectly because we need to match dynamic path.
-  }
-
-  // simpler approach:
-  const isResetPage = path.startsWith("/reset-password/");
-  const isAdminPage = path.startsWith("/admin");
-
-  const hideHeaderFooter = hideHeaderFooterPaths.includes(path) || isResetPage || isAdminPage;
+  // pages where header/footer should be hidden
+  const hideHeaderFooter =
+    path === "/login" ||
+    path === "/signin" ||
+    path === "/booking-form" ||
+    path === "/manageareas" ||
+    path === "/manageslots" ||
+    path === "/manageusers" ||
+    path === "/manageadmins" ||
+    path === "/manageadmincontactusdata" ||
+    path === "/adminviewfeedback" ||
+    path === "/adminbookingdata" ||
+    path === "/managepaymentgateway" ||
+    path === "/payment-success" ||
+    path.startsWith("/reset-password/") ||   // ✅ reset password dynamic url
+    path.startsWith("/admin") ||             // ✅ all admin routes
+    path.startsWith("/super/");              // ✅ super routes if you want
 
   return (
     <>
@@ -76,9 +78,13 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/calculator" element={<Calculator />} />
+
             <Route path="/login" element={<Login />} />
             <Route path="/signin" element={<Signin />} />
+
+            {/* ✅ Works for live link: /reset-password/<token> */}
             <Route path="/reset-password/:token" element={<ResetPassword />} />
+
             <Route
               path="/booking-form"
               element={
@@ -87,17 +93,96 @@ function App() {
                 </AuthRoute>
               }
             />
-            <Route path="/managepaymentgateway" element={<AuthRoute>< PaymentGateway /></AuthRoute>} />
-            <Route path="/payment-success" element={<AuthRoute><PaymentSuccess /></AuthRoute>} />
-            <Route path="/admin" element={<AuthRoute><AdminPanel /></AuthRoute>} />
-            <Route path="/admin/settings" element={<AuthRoute><AdminSetting /> </AuthRoute>} />
-            <Route path="/manageadmins" element={<AuthRoute><ManageAdmin /></AuthRoute>} />
-            <Route path="/manageareas" element={<AuthRoute><ManageAreas /></AuthRoute>} />
-            <Route path="/manageslots" element={<AuthRoute><ManageSlots /></AuthRoute>} />
-            <Route path="/manageusers" element={<AuthRoute><ManageUsers /></AuthRoute>} />
-            <Route path="/manageadmincontactusdata" element={<AuthRoute><ManageAdminContactusData /></AuthRoute>} />
-            <Route path="/adminviewfeedback" element={<AuthRoute><AdminViewFeedback /></AuthRoute>} />
-            <Route path="/adminbookingdata" element={<AuthRoute><AdminBookingData /></AuthRoute>} />
+
+            <Route
+              path="/managepaymentgateway"
+              element={
+                <AuthRoute>
+                  <PaymentGateway />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/payment-success"
+              element={
+                <AuthRoute>
+                  <PaymentSuccess />
+                </AuthRoute>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={
+                <AuthRoute>
+                  <AdminPanel />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <AuthRoute>
+                  <AdminSetting />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/manageadmins"
+              element={
+                <AuthRoute>
+                  <ManageAdmin />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/manageareas"
+              element={
+                <AuthRoute>
+                  <ManageAreas />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/manageslots"
+              element={
+                <AuthRoute>
+                  <ManageSlots />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/manageusers"
+              element={
+                <AuthRoute>
+                  <ManageUsers />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/manageadmincontactusdata"
+              element={
+                <AuthRoute>
+                  <ManageAdminContactusData />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/adminviewfeedback"
+              element={
+                <AuthRoute>
+                  <AdminViewFeedback />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/adminbookingdata"
+              element={
+                <AuthRoute>
+                  <AdminBookingData />
+                </AuthRoute>
+              }
+            />
 
             <Route path="/feedback" element={<Feedback />} />
             <Route path="/arealist" element={<AreaList />} />
