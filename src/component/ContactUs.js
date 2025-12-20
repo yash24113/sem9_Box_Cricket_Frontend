@@ -6,7 +6,7 @@ const Helmet = ({ children }) => children;
 
 // Use one base, then append the path used by the backend router mounting:
 // server should mount like: app.use("/api/userapi", require("./routes/userApi"));
-const API_ROOT = process.env.REACT_APP_API_ROOT || "https://sem9-box-cricket-backend.onrender.com/api/userapi";
+const API_ROOT = process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
 
 const steps = ["Contact", "Location", "Investment", "Review"];
 

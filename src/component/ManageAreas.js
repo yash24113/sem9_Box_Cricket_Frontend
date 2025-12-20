@@ -16,7 +16,7 @@ const Alert = React.forwardRef(function Alert(props, ref) {
 // Must match backend mount: app.use("/api/userapi", ...)
 const API_ROOT = (
   process.env.REACT_APP_API_BASE_URL ||
-  "https://sem9-box-cricket-backend.onrender.com/api/userapi"
+  "http://localhost:5000/api/userapi"
 ).replace(/\/+$/, "");
 
 /* ---------- helpers ---------- */

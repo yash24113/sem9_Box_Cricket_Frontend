@@ -17,7 +17,7 @@ const imageList = [
 
 const API_BASE =
   process.env.REACT_APP_API_BASE_URL_REG?.replace(/\/+$/, "") ||
-  "https://sem9-box-cricket-backend.onrender.com/api";
+  "http://localhost:5000/api";
 
 const generateUserId = () => "user_" + Date.now();
 

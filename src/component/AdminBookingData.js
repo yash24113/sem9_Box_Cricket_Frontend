@@ -46,7 +46,7 @@ const AdminBookingData = () => {
 
   const API_BASE =
     process.env.REACT_APP_API_BASE_URL ||
-    "https://sem9-box-cricket-backend.onrender.com/api/userapi";
+    "http://localhost:5000/api/userapi";
 
   useEffect(() => {
     fetchAllData();

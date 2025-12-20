@@ -8,7 +8,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const API =
-  process.env.REACT_APP_API_ROOT || "https://sem9-box-cricket-backend.onrender.com/api/userapi";
+  process.env.REACT_APP_API_ROOT || "http://localhost:5000/api/userapi";
 
 const Field = ({ label, children }) => (
   <label style={{ display: "grid", gap: 6 }}>
