@@ -231,7 +231,7 @@ export default function Header() {
                       Sign in
                     </Link>
                     <Link
-                      to="/Register"
+                      to="/Login"
                       className="drop-item"
                       onClick={() => setOpen(false)}
                     >
